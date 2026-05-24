@@ -140,9 +140,9 @@ def main():
     draw.text((tx, ty), left, fill=COIN, font=title_font)
     draw.text((tx + lw + gap + block + gap, ty), right, fill=COIN, font=title_font)
 
-    # ? block
+    # ? block — align vertically with the letter caps (small upward nudge for optical centering)
     bx = tx + lw + gap
-    by = ty + (ch - block) // 2 + ch // 8  # nudge down a touch for visual balance
+    by = ty + (ch - block) // 2 - 6
     draw_q_block(draw, bx, by, block, q_font)
 
     # Tagline
