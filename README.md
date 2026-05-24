@@ -79,6 +79,10 @@ Tabstation isn't on the Chrome Web Store (yet). For now:
 git clone https://github.com/dora-dotcom/tabstation.git
 ```
 
+> 🪶 The repo includes a handful of demo GIFs (~120 MB) for the README.
+> Want just the code? Add `--filter=blob:limit=2m` to skip the big assets:
+> `git clone --filter=blob:limit=2m https://github.com/dora-dotcom/tabstation.git`
+
 Then in Chrome:
 
 1. Open `chrome://extensions/`
@@ -139,9 +143,9 @@ Open the in-app `?` help anytime. The essentials:
 | `Enter` | Open workspace / Jump to tab / Restore recently-closed |
 | `⇧Enter` | **Switch** to workspace (close other tabs first) |
 | `1 – 9` | Quick-open Nth visible workspace |
-| `n` / `r` / `d` | New / Rename / Delete workspace |
+| `n` / `r` / `d` (or `⌫`) | New / Rename / Delete workspace |
 | `a` | Add the selected tab to a workspace |
-| `x` | Close selected tab (or all duplicates of a collapsed group) |
+| `x` (or `⌫`) | Close selected tab (or all duplicates of a collapsed group) |
 | `/` | Focus workspace search |
 | `v` (or `Tab`) | Cycle BY WINDOW / BY SITE / RECENT |
 | `Esc` | Close any modal / clear search |
