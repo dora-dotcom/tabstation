@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tabstation</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="workstation.css" />
+  </head>
+  <body data-theme="light">
+    <div id="app">
+      <header class="topbar">
+        <h1 class="logo">TABSTAT<span class="qblock" aria-label="?"><svg viewBox="0 0 16 16" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="16" height="16" fill="#FF7F50"/>
+          <rect x="0" y="0" width="16" height="1" fill="#FFB89A"/>
+          <rect x="0" y="0" width="1" height="16" fill="#FFB89A"/>
+          <rect x="0" y="15" width="16" height="1" fill="#A03020"/>
+          <rect x="15" y="0" width="1" height="16" fill="#A03020"/>
+          <rect x="2" y="2" width="1" height="1" fill="#FFFFFF"/>
+          <rect x="13" y="2" width="1" height="1" fill="#FFFFFF"/>
+          <rect x="2" y="13" width="1" height="1" fill="#FFFFFF"/>
+          <rect x="13" y="13" width="1" height="1" fill="#FFFFFF"/>
+          <rect x="6" y="3" width="4" height="1" fill="#FFFFFF"/>
+          <rect x="5" y="4" width="2" height="1" fill="#FFFFFF"/>
+          <rect x="9" y="4" width="2" height="1" fill="#FFFFFF"/>
+          <rect x="10" y="5" width="1" height="2" fill="#FFFFFF"/>
+          <rect x="8" y="7" width="2" height="1" fill="#FFFFFF"/>
+          <rect x="7" y="8" width="2" height="2" fill="#FFFFFF"/>
+          <rect x="7" y="11" width="2" height="2" fill="#FFFFFF"/>
+        </svg></span>ON</h1>
+        <div class="stats">
+          <span class="stat">WS×<span id="stat-ws">00</span></span>
+          <span class="stat">TAB×<span id="stat-tab">00</span></span>
+          <span class="stat">★×∞</span>
+        </div>
+        <div class="hotkeys">
+          <button class="btn-icon hidden" id="btn-cleanup" title="Close all orphan tabs (not in any workspace)">🗑️ <span id="orphan-count">0</span></button>
+          <button class="btn-icon" id="btn-sound" title="Toggle sound effects">🔊</button>
+          <button class="btn-icon" id="btn-theme" title="Toggle dark mode">🌙</button>
+          <button class="btn-help" id="btn-help" title="Show help (press ? anytime)">? HELP</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <!-- LEFT: Workspaces -->
+        <section class="panel workspaces-panel" id="workspaces-panel" tabindex="0">
+          <div class="panel-header">
+            <span class="panel-title">WORKSPACES</span>
+            <button class="btn-new" id="btn-new-workspace" title="New workspace (n)">
+              <span class="pipe">+ NEW</span>
+            </button>
+          </div>
+          <div class="workspace-search-wrap">
+            <input type="text" id="workspace-search" placeholder="/ to search…" autocomplete="off" />
+          </div>
+          <ul class="workspace-list" id="workspace-list">
+            <li class="empty-state">
+              <p>WORLD 1-1</p>
+              <p class="hint">PRESS <kbd>N</kbd> TO START</p>
+            </li>
+          </ul>
+        </section>
+
+        <!-- RIGHT: Open tabs -->
+        <section class="panel tabs-panel" id="tabs-panel" tabindex="0">
+          <div class="panel-header">
+            <span class="panel-title">OPEN TABS <span id="tab-count">(0)</span></span>
+            <div class="view-toggle">
+              <button class="view-btn active" data-view="window" title="Group tabs by browser window (press v or Tab to cycle)">BY WINDOW</button>
+              <button class="view-btn" data-view="domain" title="Group tabs by website — e.g. all Notion tabs together (press v or Tab)">BY SITE</button>
+              <button class="view-btn" data-view="recent" title="Sort tabs by most recently used (press v or Tab)">RECENT</button>
+            </div>
+          </div>
+          <ul class="tab-list" id="tab-list"></ul>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span><kbd>↑</kbd><kbd>↓</kbd> MOVE</span>
+        <span><kbd>←</kbd><kbd>→</kbd> PANEL</span>
+        <span><kbd>Enter</kbd> GO</span>
+        <span><kbd>1-9</kbd> JUMP</span>
+        <span><kbd>n</kbd> NEW</span>
+        <span><kbd>a</kbd> ADD</span>
+        <span><kbd>x</kbd> CLOSE</span>
+        <span><kbd>r</kbd> RENAME</span>
+        <span><kbd>d</kbd> DELETE</span>
+      </footer>
+    </div>
+
+    <!-- New workspace modal -->
+    <div class="modal-backdrop hidden" id="modal-backdrop">
+      <div class="modal" id="modal">
+        <div class="modal-header"><span id="modal-title">NEW WORKSPACE</span></div>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-footer">
+          <button class="btn-cancel" id="modal-cancel">CANCEL</button>
+          <button class="btn-confirm" id="modal-confirm">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast hidden" id="toast"></div>
+
+    <!-- Easter egg: Yoshi's Apple Garden -->
+    <div class="game-overlay hidden" id="game-overlay">
+      <div class="game-box">
+        <div class="game-header">
+          <span>🦖 YOSHI'S APPLE GARDEN</span>
+          <button class="game-close" id="game-close">×  QUIT</button>
+        </div>
+        <canvas id="game-canvas"></canvas>
+        <div class="game-hint">← → MOVE · SPACE RESTART · ESC QUIT</div>
+      </div>
+    </div>
+
+    <script src="workstation.js" type="module"></script>
+  </body>
+</html>

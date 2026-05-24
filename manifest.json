@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Tabstation",
+  "version": "0.1.0",
+  "description": "8-bit pixel workspace tab manager. Pin it as your control center.",
+  "permissions": ["tabs", "tabGroups", "storage", "bookmarks", "favicon", "sessions"],
+  "icons": {
+    "16": "assets/icon16.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open Tabstation",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+  "commands": {
+    "open-workstation": {
+      "suggested_key": {
+        "default": "Alt+Shift+W",
+        "mac": "MacCtrl+W"
+      },
+      "description": "Jump to the Tabstation tab"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: chrome-extension:"
+  }
+}

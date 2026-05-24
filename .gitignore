@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python (for assets/build_icon.py)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node (just in case)
+node_modules/
+npm-debug.log*
+
+# Local
+*.log
+.env
+.env.local
+
+# Chrome extension dev artifacts
+*.crx
+*.pem
