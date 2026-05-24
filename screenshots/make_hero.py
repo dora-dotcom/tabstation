@@ -224,7 +224,7 @@ def main():
 
     # Tagline
     tagline_font = ImageFont.truetype(FONT_PATH, 14)
-    tagline = "8-BIT PIXEL WORKSPACE TAB MANAGER FOR CHROME"
+    tagline = "8-BIT  ·  KEYBOARD-FIRST  ·  TAB MANAGER FOR CHROME"
     tb = tagline_font.getbbox(tagline)
     tagline_x = (W - (tb[2] - tb[0])) // 2
     tagline_y = ty + ch + 50

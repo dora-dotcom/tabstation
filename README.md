@@ -1,6 +1,6 @@
 # Tabstation
 
-> An 8-bit pixel workspace tab manager for Chrome. Pin one tab, run everything from there.
+> An 8-bit pixel, **keyboard-first** workspace tab manager for Chrome. Pin one tab, run everything from there — without ever reaching for the mouse.
 
 ![Tabstation hero](./screenshots/hero.png)
 
@@ -12,13 +12,13 @@ If you live in Chrome and any of these sound familiar, this is for you:
 
 | Pain | Tabstation's fix |
 | --- | --- |
+| ⌨️ I hate reaching for the mouse | **Keyboard-first** — every action has a single-key shortcut. Vim-style `hjkl` or arrow keys; modals support Tab / Enter / Esc properly. You can literally never touch the mouse. |
 | 😩 30+ tabs and I can't find anything | **Live tab list** with three views (by window / by site / by recency), full-page search |
 | 🤦 Accidentally closed a tab and `Cmd+Shift+T` only goes back one | **RECENTLY CLOSED** section — one click to restore any of the last 15 tabs/windows |
 | 🔁 Switching between projects means opening the same 8 tabs every time | **Workspaces**: save a group of URLs once, press Enter to open them all as a colour-coded Chrome tab group |
 | 🧹 Done with a project — close *those* tabs but keep the unrelated ones | `Shift+Enter` **switches** workspaces: stash the old tabs (recoverable) and open the new ones |
 | 🪲 17 Notion tabs, want them all gone | **BY SITE × ALL** — close every tab from a domain in one click |
 | 🌪️ Stray tabs that aren't part of any project pile up | **🗑️ Orphan cleanup** — top-bar button closes everything not in any workspace |
-| ⌨️ I hate the mouse | **Full keyboard nav** — arrow keys / `hjkl` everywhere, Enter to act, `?` for help |
 
 ---
 
