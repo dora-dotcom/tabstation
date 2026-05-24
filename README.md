@@ -2,9 +2,7 @@
 
 > An 8-bit pixel workspace tab manager for Chrome. Pin one tab, run everything from there.
 
-<!-- TODO: hero GIF — open Tabstation → switch a workspace with Shift+Enter → see the tab group form -->
-
-![Tabstation hero](./screenshots/hero.gif)
+![Tabstation hero](./screenshots/hero.png)
 
 ---
 
