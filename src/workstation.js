@@ -488,7 +488,7 @@ function renderTabGroup({ key, tabs }) {
       <div class="tab-item dup-head" data-tab-id="${head.id}" data-dup-toggle="${escapeHtml(key)}">
         ${faviconImg(tabFaviconUrl(head))}
         <span class="tab-title">${escapeHtml(head.title || head.url)} (${tabs.length})</span>
-        ${renderWsTag(head)}
+        ${renderWsTag(head) || '<span class="ws-tag-spacer"></span>'}
         <button class="btn-add" data-action="add-tab" data-tab-id="${head.id}" title="Add to workspace">+</button>
         <button class="btn-close" data-action="close-dup" data-dup-key="${escapeHtml(key)}" title="Close all ${tabs.length} duplicates">×${tabs.length}</button>
       </div>
@@ -503,7 +503,7 @@ function renderTab(t, { isDupChild }) {
     <div class="tab-item ${isDupChild ? "dup-child" : ""}" data-tab-id="${t.id}">
       ${faviconImg(tabFaviconUrl(t))}
       <span class="tab-title">${escapeHtml(t.title || t.url)}</span>
-      ${renderWsTag(t)}
+      ${renderWsTag(t) || '<span class="ws-tag-spacer"></span>'}
       <button class="btn-add" data-action="add-tab" data-tab-id="${t.id}" title="Add to workspace">+</button>
       <button class="btn-close" data-action="close-tab" data-tab-id="${t.id}" title="Close tab">×</button>
     </div>`;
@@ -574,14 +574,14 @@ function showModal({ title, bodyHtml, onConfirm, confirmText = "OK", hideCancel 
   $("modal-cancel").style.display = hideCancel ? "none" : "";
   $("modal-backdrop").classList.remove("hidden");
   modalState.onConfirm = onConfirm;
-  // Priority for initial focus: text input first (user starts typing), else nav-roving item, else CANCEL
+  // Priority for initial focus: text input first (user starts typing), else nav-roving item, else CONFIRM
+  // (CONFIRM as default so Enter immediately performs the action the user requested by opening the modal)
   setTimeout(() => {
     const input = $("modal-body").querySelector("input, textarea");
     if (input) { input.focus(); return; }
     const navTarget = $("modal-body").querySelector('[tabindex="0"]');
     if (navTarget) { navTarget.focus(); return; }
-    if (hideCancel) $("modal-confirm").focus();
-    else $("modal-cancel").focus();
+    $("modal-confirm").focus();
   }, 50);
 }
 
@@ -691,10 +691,15 @@ function setupGridNavigation(container, itemSelector, cols) {
       case "ArrowUp":    next = Math.max(0, cur - cols); break;
       case "ArrowDown":  next = Math.min(items.length - 1, cur + cols); break;
       case " ":
-      case "Enter":
         items[cur].click();
         e.preventDefault();
         e.stopPropagation();
+        return;
+      case "Enter":
+        // Enter inside the grid submits the whole modal (Space is for selecting)
+        e.preventDefault();
+        e.stopPropagation();
+        $("modal-confirm").click();
         return;
       default:
         return;
@@ -725,10 +730,16 @@ function setupListNavigation(container, itemSelector) {
     let next = cur;
     if (e.key === "ArrowDown") next = Math.min(items.length - 1, cur + 1);
     else if (e.key === "ArrowUp") next = Math.max(0, cur - 1);
-    else if (e.key === " " || e.key === "Enter") {
+    else if (e.key === " ") {
       items[cur].click();
       e.preventDefault();
       e.stopPropagation();
+      return;
+    } else if (e.key === "Enter") {
+      // Enter submits the modal (Space is for selecting/toggling)
+      e.preventDefault();
+      e.stopPropagation();
+      $("modal-confirm").click();
       return;
     } else return;
     if (next !== cur) {
