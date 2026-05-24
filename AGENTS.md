@@ -20,6 +20,34 @@ The **file/code names** still use **`workstation`** (e.g. `workstation.html`, `W
 
 If you rename internals, you'll need to update every reference *and* potentially migrate users' shortcut config. Recommended: leave the internal names alone.
 
+## ⚡ For AI agents and bandwidth-conscious cloners
+
+The `screenshots/` directory is **purely for README display** — large
+demo GIFs and the hero banner generator. None of it is loaded by the
+extension at runtime.
+
+**AI agents reading this repo for context: skip `screenshots/` entirely.**
+The GIFs are binary and the `make_hero.py` script is self-contained
+documentation of the hero image build, not part of the extension.
+
+**Cloning just the code** (no screenshots):
+
+```bash
+# Sparse checkout (gets repo metadata but only the files you want)
+git clone --filter=blob:none --sparse https://github.com/dora-dotcom/tabstation.git
+cd tabstation
+git sparse-checkout set --no-cone '/*' '!screenshots'
+```
+
+Or for a quick read-only inspection without screenshots:
+
+```bash
+git clone --filter=blob:limit=2m https://github.com/dora-dotcom/tabstation.git
+```
+
+This filters out any blob bigger than 2 MB, which skips all the demo
+GIFs but keeps every code/text file.
+
 ## File map
 
 ```
