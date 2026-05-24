@@ -4,6 +4,10 @@
 
 ![Tabstation hero](./screenshots/hero.png)
 
+> **The flagship move** — `Shift+Enter` on a workspace stashes everything you don't need and pops the new tabs into a colour-coded Chrome group:
+
+![Workspace switch in action](./screenshots/switch.gif)
+
 ---
 
 ## Why Tabstation?
@@ -31,21 +35,29 @@ If you live in Chrome and any of these sound familiar, this is for you:
 - `Shift+Enter` to **switch** — closes everything else first
 - Inline expand to see the URLs without opening them
 
+![Creating a new workspace](./screenshots/new-workspace.gif)
+
 ### 🪟 Live tab list
 - Three views: **BY WINDOW** / **BY SITE** / **RECENT** — toggle with `v` or `Tab`
 - Duplicate URLs collapse into a group with `×N` close-all
 - Each domain in BY SITE has `× ALL` to nuke all tabs from that site
 - Each window in BY WINDOW has `× ALL` to close that window's tabs
 
+![Batch-close all tabs in a view with × ALL](./screenshots/switch-close-by-view.gif)
+
 ### ⏪ Recently closed
 - Last 15 closed tabs and windows live at the bottom of the right panel
 - Click or `Enter` to restore
 - Closed windows restore as full windows with all their tabs
 
+![Restore a recently closed tab](./screenshots/recently-closed.gif)
+
 ### 🌅 Day / Night / Auto theme
 - Light mode: SMB1 sky blue
 - Dark mode: night desert — purple sky with stars, moon, cacti silhouettes on the horizon
 - 🌗 **Auto** mode follows your macOS Display setting (light by day, dark by night)
+
+![Theme toggle — light to dark](./screenshots/theme.gif)
 
 ### 🎵 Sound effects
 - Coin sound when you add a tab, 1-UP on new workspace, pipe-slide on open, etc.
@@ -54,6 +66,8 @@ If you live in Chrome and any of these sound familiar, this is for you:
 ### 🦖 Easter egg
 - Click the **TABSTAT?ON** logo 5 times in a row, *or* type the Konami code (`↑↑↓↓←→←→BA`)
 - Plays **Yoshi's Apple Garden** — catch 🍎 apples, avoid 💣 bombs, ⭐ stars give big points. High score saved.
+
+![Yoshi's Apple Garden mini-game](./screenshots/yoshi.gif)
 
 ---
 
