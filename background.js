@@ -1,3 +1,6 @@
+// MV3 service worker: this script is suspended when idle, so don't keep global
+// state here. Strictly event-driven (commands, action click, install).
+
 const TABSTATION_URL = chrome.runtime.getURL("src/tabstation.html");
 
 async function focusOrOpenTabstation() {
@@ -19,6 +22,8 @@ async function focusOrOpenTabstation() {
   return newTab;
 }
 
+// Mac shortcut quirk: in manifest commands, "Ctrl" maps to Command on Mac.
+// Use "MacCtrl" for the literal Ctrl key (default Mac hotkey: MacCtrl+W).
 chrome.commands.onCommand.addListener((cmd) => {
   if (cmd === "open-tabstation") focusOrOpenTabstation();
 });

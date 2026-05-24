@@ -169,6 +169,8 @@ function normalizeUrl(url) {
 }
 
 // For stored URLs (workspace), use Chrome's own favicon cache via _favicon API.
+// Requires both `favicon` AND `tabs` permissions in manifest.json — having one
+// without the other returns a blank image silently.
 function faviconUrl(url) {
   try {
     const u = new URL(chrome.runtime.getURL("/_favicon/"));
@@ -585,7 +587,9 @@ function showModal({ title, bodyHtml, onConfirm, confirmText = "OK", hideCancel 
   }, 50);
 }
 
-// Focus trap: Tab key cycles within the open modal instead of escaping to the page
+// Focus trap: Tab key cycles within the open modal instead of escaping to the page.
+// offsetParent !== null filters out display:none elements (e.g. CANCEL when
+// hideCancel is set) — without it Tab would seem to "skip a step" past hidden items.
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Tab") return;
   const backdrop = $("modal-backdrop");

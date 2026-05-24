@@ -1,155 +1,103 @@
-# Tabstation — agent / contributor guide
+# AGENTS.md — Tabstation: install guide for coding agents
 
-This file is for anyone (human or AI) reading the codebase fresh. It explains the architecture, the non-obvious conventions, and how to make changes without breaking things.
+You're installing **Tabstation** for the user. Your job is not just to set it up — get them excited about using it.
 
-## TL;DR
+> **Editing the code instead?** This file is install-flow only. The codebase is vanilla HTML / CSS / JS at `src/tabstation.{html,css,js}` — section headers (`// ===`) in `tabstation.js` mark the major subsystems, and non-obvious gotchas are inline comments at their site. No build step, no framework, no TypeScript.
 
-- **Type**: Chrome Extension, Manifest V3
-- **Stack**: vanilla HTML / CSS / JS — no bundler, no framework, no TypeScript
-- **Entry point**: a single full-page UI at `src/tabstation.html`, opened as a pinned tab
-- **Persistence**: `chrome.storage.local` (per-machine, no sync)
-- **Dev workflow**: edit files → `chrome://extensions/` reload (if `manifest.json` changed) → `Cmd+R` the open Tabstation tab
+---
 
-## Wordmark
+## Step 0 — Introduce the product
 
-The brand is **Tabstation** with a `?` block in place of the `I` — the wordmark is `TABSTAT?ON`.
+Before doing anything technical, tell the user what they're about to get:
 
-## ⚡ For AI agents and bandwidth-conscious cloners
+> **Tabstation** is a keyboard-first 8-bit pixel workspace tab manager for Chrome. Pin one tab, and run everything from there — without ever reaching for the mouse.
+>
+> What makes it great:
+> - **Workspaces** — save a group of URLs once, press Enter to open them all as a colour-coded Chrome tab group
+> - **`Shift+Enter` switches workspaces** — stash the old tabs (recoverable) and open the new ones
+> - **Keyboard-first** — Vim-style `hjkl` or arrows; every action has a single-key shortcut
+> - **Recently closed panel** — restore any of the last 15 closed tabs/windows
+> - **Three views** — by window, by site, by recency, with full-page search
+> - **Duplicate collapse** — same URL open twice gets grouped with one-click close-all
+> - **Orphan cleanup** — one click closes every tab not in any workspace
+> - **8-bit pixel aesthetic** with light / dark / auto themes (auto follows your OS in real time)
+> - **100% local** — `chrome.storage.local`, no server, no account, no telemetry
+> - Konami code easter egg 🦖 with chiptune sound
+>
+> Setup takes about 1 minute.
 
-The `screenshots/` directory is **purely for README display** — large
-demo GIFs and the hero banner generator. None of it is loaded by the
-extension at runtime.
+---
 
-**AI agents reading this repo for context: skip `screenshots/` entirely.**
-The GIFs are binary and the `make_hero.py` script is self-contained
-documentation of the hero image build, not part of the extension.
+## Step 1 — Clone the repo
 
-**Cloning just the code** (no screenshots):
-
-```bash
-# Sparse checkout (gets repo metadata but only the files you want)
-git clone --filter=blob:none --sparse https://github.com/dora-dotcom/tabstation.git
-cd tabstation
-git sparse-checkout set --no-cone '/*' '!screenshots'
-```
-
-Or for a quick read-only inspection without screenshots:
+The extension doesn't need the demo GIFs in `screenshots/` (they're README-only, ~120 MB). Skip them with a blob-size filter:
 
 ```bash
 git clone --filter=blob:limit=2m https://github.com/dora-dotcom/tabstation.git
+cd tabstation
 ```
 
-This filters out any blob bigger than 2 MB, which skips all the demo
-GIFs but keeps every code/text file.
+---
 
-## File map
+## Step 2 — Load the Chrome extension
 
-```
-manifest.json            Chrome MV3 manifest. Permissions, icons, command hotkey.
-background.js            Service worker. Listens for the open-tabstation hotkey
-                         and the toolbar icon click → focuses / opens the Tabstation tab.
-assets/
-  build_icon.py          PIL script that generates icon16/48/128.png from a
-                         16×16 pixel grid. Run with `python3 assets/build_icon.py`.
-  icon16/48/128.png      Coral ? block extension icons (referenced from manifest).
-src/
-  tabstation.html       Single-page UI markup. Hosts the topbar, two panels,
-                         footer, modal, toast, and easter-egg game overlay.
-  tabstation.css        All styles. Mario-flavoured palette via CSS variables
-                         that are remapped under `body[data-theme="dark"]`.
-  tabstation.js         All logic — see "Architecture" below.
-README.md                Public-facing intro.
-AGENTS.md                This file.
-LICENSE                  MIT.
-.gitignore
+This is the one step that requires manual action from the user. Make it as easy as possible.
+
+**Print the full path to the repo folder**:
+
+```bash
+echo "Extension folder: $(pwd)"
 ```
 
-There is no `node_modules`, no build step, no test framework. Everything in `src/` runs in the Chrome extension page context as-is.
+**Copy it to the clipboard**:
+- macOS: `pwd | pbcopy && echo "Path copied to clipboard"`
+- Linux: `pwd | xclip -selection clipboard && echo "Path copied to clipboard"`
+- Windows: `echo %CD% | clip && echo Path copied`
 
-## Architecture (`tabstation.js`)
+**Open the extensions page**:
 
-One big module split into logical sections by `// ===` headers. State lives in one `state` object at the top. The render path is straightforward:
-
+```bash
+open "chrome://extensions"
 ```
-chrome events  ─┐
-user actions   ─┼─→ mutate `state` → call render() → render() rewrites innerHTML of the panels
-chrome.storage─┘
-```
 
-Key state:
-- `state.workspaces` — array of `{id, name, emoji, color, urls, createdAt}` (persisted)
-- `state.tabs` / `state.windows` — refreshed from `chrome.tabs.query` on tab events (debounced)
-- `state.settings` — `theme`, `soundOn`, `view`, `firstLaunchDone`, etc. (persisted)
-- `state.focusPanel` / `state.wsIdx` / `state.tabIdx` — keyboard navigation state
-- `state.navTabs` — flat list of navigable items in the right panel, rebuilt on each render. Each entry is `{kind, …}` where kind ∈ `tab | recent | recent-header | domain-header | window-header`. Keyboard handlers dispatch on `kind`.
-- `state.recentlyClosed` — from `chrome.sessions.getRecentlyClosed`
-- `state.search` — workspace name filter
+**Walk the user through it**:
 
-### Rendering
+> I've copied the extension folder path to your clipboard. Now:
+>
+> 1. In the **top-right corner**, toggle on **Developer mode**.
+> 2. A **Load unpacked** button appears top-left. Click it.
+> 3. In the file picker, press **Cmd+Shift+G** (Mac) or **Ctrl+L** (Windows/Linux) to open "Go to folder", paste the path (Cmd+V / Ctrl+V), and press Enter.
+> 4. Click **Select** / **Open**.
+>
+> You should see "Tabstation" appear in your extensions list, and a pinned Tabstation tab opens automatically.
 
-`render()` calls `renderStats()` + `renderWorkspaces()` + `renderTabs()`. The renderers rebuild `innerHTML` from scratch — there's no incremental diff. With ~30 tabs this is fast enough; if you need to scale up significantly, consider keying the lists.
+**Fallback**, open the folder in a file browser so the user can drag it onto the extensions page:
+- macOS: `open .`
+- Linux: `xdg-open .`
+- Windows: `explorer .`
 
-`renderTabs()` chooses between `renderWindowGroup()` / `renderDomainGroups()` / `renderRecentList()` based on `state.settings.view`, then appends `renderRecentlyClosedSection()` at the bottom.
+---
 
-### Keyboard
+## Step 3 — Show them around
 
-One global `document.addEventListener("keydown", …)` handles everything. Order matters:
-1. Konami code tracker (always live, including inside inputs / modals)
-2. Easter-egg game escape if the game overlay is open
-3. Skip if a modal is open *or* the user is typing in an `<input>` / `<textarea>` (with a couple of exceptions like `Esc` and `Enter` on the name input)
-4. Global keys: `?`, `n`, `/`, `1‑9`, `v`, `Tab`
-5. Per-panel keys: `h/j/k/l` (or arrows), `Enter`, `a`, `x`, `r`, `d`
+> You're in. A first-launch wizard appears and offers to turn each of your Chrome bookmark folders into a workspace — accept and you've got a complete control center in 5 seconds.
+>
+> Things to try right away:
+> 1. Press **`?`** to see all keyboard shortcuts
+> 2. Use **`h/j/k/l`** (or arrows) to navigate; **Tab** to switch panel
+> 3. Press **Enter** on a workspace to open all its URLs as a Chrome tab group
+> 4. Press **Shift+Enter** to *switch* workspaces — stashes current tabs, opens new
+> 5. Press **`/`** to filter workspaces by name
+> 6. Press **`v`** to cycle tab views (by window / site / recency)
+> 7. The default hotkey is **MacCtrl+W** (Mac) or **Alt+Shift+W** (others) to jump to the Tabstation tab from anywhere — customise it at `chrome://extensions/shortcuts`
+> 8. Click the **Tabstation logo** 5 times in a row… 🦖
 
-The selected item visually highlights via the `.selected` class; for grids inside modals there's a roving-tabindex pattern (`setupGridNavigation` / `setupListNavigation`). Modals have a focus trap so `Tab` doesn't escape to the page.
+---
 
-### Theme
+## Key facts
 
-CSS variables on `:root` (light) and overridden on `body[data-theme="dark"]`. Important gotcha: any selector like `[data-theme="dark"] body { … }` is wrong because `body` *is* the element carrying the attribute — use `body[data-theme="dark"] { … }` instead. Both `::before` (stars + moon, fixed pointer-events:none overlay) and `::after` (cactus silhouettes) only render in dark mode.
-
-`auto` theme uses `window.matchMedia('(prefers-color-scheme: dark)')` and listens for changes so the theme follows the OS in real time.
-
-### Sound
-
-Web Audio API synthesised tones (no audio files). `tone({freq, dur, type, vol, slide, delay})` is the primitive; named helpers (`sfxCoin`, `sfxOneUp`, `sfxPipe`, `sfxClose`, `sfxError`, `sfxBlip`) are called at the corresponding user actions. Audio context is created lazily on the first user gesture.
-
-### Easter egg game
-
-Class `YoshiGame` runs an HTML5 canvas inside an overlay (`#game-overlay`). When active, it captures keyboard events with `capture: true` so they don't leak to the main keyboard handler. Game state is local to the class; only the high score persists (via `localStorage`).
-
-### Adding a new feature
-
-The typical loop:
-1. Add to `state` and `state.settings` (with a sensible default)
-2. Persist via `saveSettings()` / `saveWorkspaces()` when changed
-3. Add UI to `tabstation.html` (or render it dynamically from JS)
-4. Update `render*` functions to draw it
-5. Add keyboard handling in the main `keydown` listener if applicable
-6. Add CSS, with a `body[data-theme="dark"]` override if it has colour
-7. Update the in-app HELP modal (search for `★ KEYBOARD` etc.) so users discover it
-
-## Conventions
-
-- **No semicolons after function expressions used as statements** is fine; the codebase uses semicolons but isn't strictly Prettier'd.
-- **No `var`**, always `const` / `let`.
-- **Single quotes are fine in HTML attribute values** inside JS template strings — we sometimes use them to avoid `escapeHtml` noise.
-- **`escapeHtml(…)`** every user string interpolated into `innerHTML`. It's defined near the top of `tabstation.js`.
-- **`normalizeUrl(url)`** strips hash and query before comparing URLs. Use it whenever you compare a tab URL to a workspace URL.
-- **Filter the Tabstation tab itself** out of `state.tabs` via `isTabstationUrl` — don't list our own page as an "open tab".
-
-## Common pitfalls
-
-- **Service-worker lifetime**: `background.js` is suspended when idle. Keep it event-driven — don't store global state there.
-- **`favicon` permission**: stored URLs (workspace items) use `chrome.runtime.getURL("/_favicon/")` which requires the `favicon` permission *and* the `tabs` permission. Live tabs use `tab.favIconUrl` directly.
-- **Mac shortcut quirk**: in Chrome's `commands`, `"Ctrl"` on Mac maps to `Command`. Use `"MacCtrl"` for the literal Ctrl key. Tabstation's default Mac hotkey is `MacCtrl+W`.
-- **Modal `display: none`**: focus-trap filtering uses `el.offsetParent !== null` to skip hidden elements (e.g. the CANCEL button when `hideCancel` is set).
-
-## How to reload during development
-
-- **JS / CSS / HTML changes** → `Cmd+R` the Tabstation tab. Service worker (`background.js`) keeps running.
-- **`background.js` changes** → reload the extension at `chrome://extensions/`.
-- **`manifest.json` changes** → reload the extension *and* hard-refresh the tab (`Cmd+Shift+R`).
-- **Adding/removing permissions** → reload extension; Chrome will prompt for new permissions if they're optional.
-
-## License
-
-MIT. See `LICENSE`.
+- Pure Chrome extension. No server, no Node.js, no npm, no build step.
+- Persistence: `chrome.storage.local`, per-machine.
+- 100% local, no external service.
+- To update: `cd tabstation && git pull`, then reload at `chrome://extensions`.
+- Full feature tour and screenshots: see `README.md`.

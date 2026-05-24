@@ -71,7 +71,19 @@ If you live in Chrome and any of these sound familiar, this is for you:
 
 ---
 
-## Install (load unpacked)
+## Install with a coding agent
+
+Send your coding agent (Claude Code, Codex, etc.) this repo URL and say **"install this"**:
+
+```
+https://github.com/dora-dotcom/tabstation
+```
+
+The agent will introduce you to Tabstation, walk you through loading the extension, and show you the keyboard shortcuts. Takes about 1 minute. See [AGENTS.md](./AGENTS.md) for the script it follows.
+
+---
+
+## Manual install
 
 Tabstation isn't on the Chrome Web Store (yet). For now:
 
@@ -168,7 +180,7 @@ A few things that aren't accidents:
 
 ## Hacking on it
 
-See [AGENTS.md](./AGENTS.md) for architecture, file structure, and conventions. Short version:
+Vanilla HTML / CSS / JS. No build step, no framework, no TypeScript. Section headers (`// ===`) in `tabstation.js` mark the major subsystems; non-obvious gotchas (Mac shortcut quirk, favicon permission, theme selector form, focus-trap filter, MV3 service-worker lifetime) live as inline comments at their site. File tree:
 
 ```
 manifest.json           ← Chrome extension manifest (MV3)

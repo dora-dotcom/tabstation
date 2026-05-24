@@ -51,6 +51,8 @@
 }
 
 /* Mario night: light purple SKY at top → hard horizon → deep purple GROUND at bottom */
+/* Selector form: body[data-theme="dark"] {…}. NOT [data-theme="dark"] body {…} —
+   body IS the element carrying the attribute, not an ancestor. */
 body[data-theme="dark"] {
   background: linear-gradient(
     to bottom,
