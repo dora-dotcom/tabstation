@@ -1144,11 +1144,11 @@ function openHelpModal() {
           <span class="k">Enter</span><span>Open workspace / Jump to tab</span>
           <span class="k">⇧Enter</span><span>SWITCH to workspace (close other tabs first)</span>
           <span class="k">a</span><span>Add the selected tab to a workspace</span>
-          <span class="k">x</span><span>Close the selected tab (or all duplicates if it's a group head)</span>
+          <span class="k">x / ⌫</span><span>Close the selected tab (or all duplicates if it's a group head)</span>
           <span class="k">1 – 9</span><span>Quick-open workspace #1–9</span>
           <span class="k">n</span><span>New workspace</span>
           <span class="k">r</span><span>Rename selected workspace</span>
-          <span class="k">d</span><span>Delete selected workspace</span>
+          <span class="k">d / ⌫</span><span>Delete selected workspace</span>
           <span class="k">v</span><span>Cycle tab-list view (window / site / recent) · Tab also works</span>
           <span class="k">/</span><span>Focus workspace search</span>
           <span class="k">?</span><span>Show this help</span>
@@ -1376,7 +1376,7 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     return;
   }
-  if (k === "d" && state.focusPanel === "ws" && state.workspaces[state.wsIdx]) {
+  if ((k === "d" || k === "Backspace") && state.focusPanel === "ws" && state.workspaces[state.wsIdx]) {
     openDeleteWorkspaceModal(state.wsIdx);
     e.preventDefault();
     return;
@@ -1451,7 +1451,7 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     return;
   }
-  if (k === "x" && state.focusPanel === "tabs" && state.navTabs[state.tabIdx] !== undefined) {
+  if ((k === "x" || k === "Backspace") && state.focusPanel === "tabs" && state.navTabs[state.tabIdx] !== undefined) {
     const sel = state.navTabs[state.tabIdx];
     if (sel.kind !== "tab") { e.preventDefault(); return; }
     const tabId = sel.id;
