@@ -1,7 +1,7 @@
-const WORKSTATION_URL = chrome.runtime.getURL("src/workstation.html");
+const TABSTATION_URL = chrome.runtime.getURL("src/tabstation.html");
 
-async function focusOrOpenWorkstation() {
-  const tabs = await chrome.tabs.query({ url: WORKSTATION_URL });
+async function focusOrOpenTabstation() {
+  const tabs = await chrome.tabs.query({ url: TABSTATION_URL });
   if (tabs.length > 0) {
     const tab = tabs[0];
     await chrome.tabs.update(tab.id, { active: true });
@@ -10,7 +10,7 @@ async function focusOrOpenWorkstation() {
   }
   const win = await chrome.windows.getCurrent();
   const newTab = await chrome.tabs.create({
-    url: WORKSTATION_URL,
+    url: TABSTATION_URL,
     windowId: win.id,
     index: 0,
     pinned: true,
@@ -20,13 +20,13 @@ async function focusOrOpenWorkstation() {
 }
 
 chrome.commands.onCommand.addListener((cmd) => {
-  if (cmd === "open-workstation") focusOrOpenWorkstation();
+  if (cmd === "open-tabstation") focusOrOpenTabstation();
 });
 
 chrome.action.onClicked.addListener(() => {
-  focusOrOpenWorkstation();
+  focusOrOpenTabstation();
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  focusOrOpenWorkstation();
+  focusOrOpenTabstation();
 });

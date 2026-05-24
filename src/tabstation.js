@@ -15,7 +15,7 @@ const CHROME_TG_COLORS = {
   purple: "purple", cyan: "cyan", pink: "pink", orange: "orange",
 };
 
-const WORKSTATION_URL = chrome.runtime.getURL("src/workstation.html");
+const TABSTATION_URL = chrome.runtime.getURL("src/tabstation.html");
 
 // ============================================================
 // STATE
@@ -197,8 +197,8 @@ function domainOf(url) {
   }
 }
 
-function isWorkstationUrl(url) {
-  return url && url.startsWith(WORKSTATION_URL.split("#")[0]);
+function isTabstationUrl(url) {
+  return url && url.startsWith(TABSTATION_URL.split("#")[0]);
 }
 
 function findWorkspaceForUrl(normalized) {
@@ -219,7 +219,7 @@ function escapeHtml(s) {
 
 async function refreshTabs() {
   const tabs = await chrome.tabs.query({});
-  state.tabs = tabs.filter((t) => !isWorkstationUrl(t.url));
+  state.tabs = tabs.filter((t) => !isTabstationUrl(t.url));
   state.windows = [...new Set(state.tabs.map((t) => t.windowId))];
 }
 
@@ -229,7 +229,7 @@ async function refreshRecentlyClosed() {
     const sessions = await chrome.sessions.getRecentlyClosed({ maxResults: 15 });
     state.recentlyClosed = sessions.filter((s) => {
       const url = s.tab?.url || s.window?.tabs?.[0]?.url;
-      return !isWorkstationUrl(url);
+      return !isTabstationUrl(url);
     });
   } catch (err) {
     console.warn("sessions API failed", err);
@@ -1638,6 +1638,7 @@ function setupEasterEggTriggers() {
 let _yoshi = null;
 function launchYoshiGame() {
   toast("🦖 LET'S-A-GO!");
+  sfxOneUp();
   $("game-overlay").classList.remove("hidden");
   if (_yoshi) _yoshi.stop();
   _yoshi = new YoshiGame($("game-canvas"));
@@ -1666,6 +1667,9 @@ class YoshiGame {
     document.addEventListener("keydown", this._onDown, true);
     document.addEventListener("keyup", this._onUp, true);
     this.lastFrame = performance.now();
+    this._bgmStep = 0;
+    this._bgmTimer = null;
+    this._scheduleBgmTick();
     requestAnimationFrame(this.loop.bind(this));
   }
   reset() {
@@ -1678,7 +1682,7 @@ class YoshiGame {
     this.highScore = parseInt(localStorage.getItem("yoshi_hi") || "0", 10);
   }
   _onDown(e) {
-    // Block from leaking to workstation while game is open
+    // Block from leaking to tabstation while game is open
     this.keys[e.key] = true;
     if (this.gameOver && e.key === " ") {
       this.reset();
@@ -1700,8 +1704,25 @@ class YoshiGame {
   }
   stop() {
     this.running = false;
+    clearTimeout(this._bgmTimer);
     document.removeEventListener("keydown", this._onDown, true);
     document.removeEventListener("keyup", this._onUp, true);
+  }
+  _scheduleBgmTick() {
+    if (!this.running) return;
+    const elapsed = (performance.now() - this.startTime) / 1000;
+    const interval = Math.max(220, 500 - elapsed * 4);
+    this._bgmTimer = setTimeout(() => {
+      this._bgmTick();
+      this._scheduleBgmTick();
+    }, interval);
+  }
+  _bgmTick() {
+    if (this.gameOver) return;
+    // walking bass: A2 E2 A2 G2
+    const notes = [110, 82.41, 110, 98];
+    tone({ freq: notes[this._bgmStep % notes.length], dur: 0.08, type: "triangle", vol: 0.05 });
+    this._bgmStep++;
   }
   loop(now) {
     if (!this.running) return;
@@ -1739,11 +1760,12 @@ class YoshiGame {
       const aT = a.y + 4, aB = a.y + a.h - 4;
       const hit = aR > yL && aL < yR && aB > yT && aT < yB;
       if (hit) {
-        if (a.kind === "apple") this.score += 10;
-        else if (a.kind === "star") { this.score += 50; this.flashFrames = 8; }
+        if (a.kind === "apple") { this.score += 10; sfxCoin(); }
+        else if (a.kind === "star") { this.score += 50; this.flashFrames = 8; sfxOneUp(); }
         else if (a.kind === "bomb") {
           this.lives--;
           this.flashFrames = 14;
+          sfxError();
           if (this.lives <= 0) this._endGame();
         }
         return false;
@@ -1760,6 +1782,7 @@ class YoshiGame {
   }
   _endGame() {
     this.gameOver = true;
+    sfxPipe();
     if (this.score > this.highScore) {
       this.highScore = this.score;
       localStorage.setItem("yoshi_hi", String(this.highScore));

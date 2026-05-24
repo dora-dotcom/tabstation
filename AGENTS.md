@@ -6,19 +6,13 @@ This file is for anyone (human or AI) reading the codebase fresh. It explains th
 
 - **Type**: Chrome Extension, Manifest V3
 - **Stack**: vanilla HTML / CSS / JS — no bundler, no framework, no TypeScript
-- **Entry point**: a single full-page UI at `src/workstation.html`, opened as a pinned tab
+- **Entry point**: a single full-page UI at `src/tabstation.html`, opened as a pinned tab
 - **Persistence**: `chrome.storage.local` (per-machine, no sync)
 - **Dev workflow**: edit files → `chrome://extensions/` reload (if `manifest.json` changed) → `Cmd+R` the open Tabstation tab
 
-## Naming quirk to know upfront
+## Wordmark
 
-The **brand** is **Tabstation** (with a `?` block in place of the `I` — the wordmark is `TABSTAT?ON`).
-
-The **file/code names** still use **`workstation`** (e.g. `workstation.html`, `WORKSTATION_URL`, `isWorkstationUrl`). That's deliberate: the user-facing strings were renamed but file paths and internal identifiers were kept stable so:
-- Chrome's `commands` shortcut binding (`open-workstation`) doesn't break for users who set a custom hotkey
-- No `chrome.runtime.getURL("src/workstation.html")` paths break
-
-If you rename internals, you'll need to update every reference *and* potentially migrate users' shortcut config. Recommended: leave the internal names alone.
+The brand is **Tabstation** with a `?` block in place of the `I` — the wordmark is `TABSTAT?ON`.
 
 ## ⚡ For AI agents and bandwidth-conscious cloners
 
@@ -52,18 +46,18 @@ GIFs but keeps every code/text file.
 
 ```
 manifest.json            Chrome MV3 manifest. Permissions, icons, command hotkey.
-background.js            Service worker. Listens for the open-workstation hotkey
+background.js            Service worker. Listens for the open-tabstation hotkey
                          and the toolbar icon click → focuses / opens the Tabstation tab.
 assets/
   build_icon.py          PIL script that generates icon16/48/128.png from a
                          16×16 pixel grid. Run with `python3 assets/build_icon.py`.
   icon16/48/128.png      Coral ? block extension icons (referenced from manifest).
 src/
-  workstation.html       Single-page UI markup. Hosts the topbar, two panels,
+  tabstation.html       Single-page UI markup. Hosts the topbar, two panels,
                          footer, modal, toast, and easter-egg game overlay.
-  workstation.css        All styles. Mario-flavoured palette via CSS variables
+  tabstation.css        All styles. Mario-flavoured palette via CSS variables
                          that are remapped under `body[data-theme="dark"]`.
-  workstation.js         All logic — see "Architecture" below.
+  tabstation.js         All logic — see "Architecture" below.
 README.md                Public-facing intro.
 AGENTS.md                This file.
 LICENSE                  MIT.
@@ -72,7 +66,7 @@ LICENSE                  MIT.
 
 There is no `node_modules`, no build step, no test framework. Everything in `src/` runs in the Chrome extension page context as-is.
 
-## Architecture (`workstation.js`)
+## Architecture (`tabstation.js`)
 
 One big module split into logical sections by `// ===` headers. State lives in one `state` object at the top. The render path is straightforward:
 
@@ -127,7 +121,7 @@ Class `YoshiGame` runs an HTML5 canvas inside an overlay (`#game-overlay`). When
 The typical loop:
 1. Add to `state` and `state.settings` (with a sensible default)
 2. Persist via `saveSettings()` / `saveWorkspaces()` when changed
-3. Add UI to `workstation.html` (or render it dynamically from JS)
+3. Add UI to `tabstation.html` (or render it dynamically from JS)
 4. Update `render*` functions to draw it
 5. Add keyboard handling in the main `keydown` listener if applicable
 6. Add CSS, with a `body[data-theme="dark"]` override if it has colour
@@ -138,9 +132,9 @@ The typical loop:
 - **No semicolons after function expressions used as statements** is fine; the codebase uses semicolons but isn't strictly Prettier'd.
 - **No `var`**, always `const` / `let`.
 - **Single quotes are fine in HTML attribute values** inside JS template strings — we sometimes use them to avoid `escapeHtml` noise.
-- **`escapeHtml(…)`** every user string interpolated into `innerHTML`. It's defined near the top of `workstation.js`.
+- **`escapeHtml(…)`** every user string interpolated into `innerHTML`. It's defined near the top of `tabstation.js`.
 - **`normalizeUrl(url)`** strips hash and query before comparing URLs. Use it whenever you compare a tab URL to a workspace URL.
-- **Filter the Tabstation tab itself** out of `state.tabs` via `isWorkstationUrl` — don't list our own page as an "open tab".
+- **Filter the Tabstation tab itself** out of `state.tabs` via `isTabstationUrl` — don't list our own page as an "open tab".
 
 ## Common pitfalls
 

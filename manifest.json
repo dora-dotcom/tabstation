@@ -21,7 +21,7 @@
     }
   },
   "commands": {
-    "open-workstation": {
+    "open-tabstation": {
       "suggested_key": {
         "default": "Alt+Shift+W",
         "mac": "MacCtrl+W"

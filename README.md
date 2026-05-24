@@ -175,9 +175,9 @@ manifest.json           ← Chrome extension manifest (MV3)
 background.js           ← Service worker: global hotkey + open-Tabstation logic
 assets/                 ← Extension icons (16/48/128) + Python build script
 src/
-  workstation.html      ← Single-page UI
-  workstation.css       ← All styles, including light/dark themes
-  workstation.js        ← All logic — state, rendering, keyboard, easter egg game
+  tabstation.html      ← Single-page UI
+  tabstation.css       ← All styles, including light/dark themes
+  tabstation.js        ← All logic — state, rendering, keyboard, easter egg game
 ```
 
 To iterate: change a file → `chrome://extensions/` reload (if `manifest.json` changed) → `Cmd+R` the Tabstation tab.
