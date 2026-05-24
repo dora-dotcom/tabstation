@@ -83,6 +83,37 @@ Rebind the hotkey at `chrome://extensions/shortcuts`.
 
 ---
 
+## First launch
+
+A pinned Tabstation tab opens automatically. The first time it loads, a small wizard appears:
+
+### 📚 Bookmark import wizard
+
+> Found N bookmark folder(s). Pick which to import as workspaces.
+
+Tabstation scans your Chrome bookmark folders and offers to turn each one into a workspace (the folder's URLs become the workspace's URLs, and each gets a random Mario emoji + colour). It's the fastest way to get started if you already organise tabs as bookmarks.
+
+- **Use ↑↓ + Space** to pick a folder, **Tab** to the IMPORT button, **Enter** to confirm.
+- Don't want any of them? Just press **Esc** (or click CANCEL) — nothing is imported and the wizard never bothers you again.
+- After import you can rename / re-emoji / recolor any workspace with `r` (or right-click → edit).
+
+If you have zero bookmark folders, the wizard skips silently and you start with an empty WORLD 1-1 — press `n` (or click `+ NEW`) to create your first workspace.
+
+### Defaults you might want to change
+
+All of these have a button in the top bar or a `chrome://extensions/shortcuts` entry:
+
+| Default | What it means | Where to change |
+| --- | --- | --- |
+| 🌗 **Theme: Auto** | Follows your macOS Display setting (light by day, dark by night) | Click the 🌗 / 🌙 / ☀️ button to cycle |
+| 🔊 **Sound: On** | Web-audio synth beeps on actions | Click the 🔊 button to mute |
+| 🪟 **Tab view: BY WINDOW** | Right panel groups tabs per Chrome window | Click `BY WINDOW` / `BY SITE` / `RECENT`, or press `v` |
+| ⌨️ **Hotkey: `Ctrl+W` (Mac)** | Jumps to Tabstation from anywhere in Chrome | `chrome://extensions/shortcuts` |
+
+Press `?` any time to see the full keyboard cheatsheet inside the app.
+
+---
+
 ## Keyboard cheatsheet
 
 Open the in-app `?` help anytime. The essentials:
