@@ -579,7 +579,12 @@ function showModal({ title, bodyHtml, onConfirm, confirmText = "OK", hideCancel 
   // Priority for initial focus: text input first (user starts typing), else nav-roving item, else CONFIRM
   // (CONFIRM as default so Enter immediately performs the action the user requested by opening the modal)
   setTimeout(() => {
-    const input = $("modal-body").querySelector("input, textarea");
+    // Skip inputs explicitly opted out of tab focus (e.g. checkboxes inside
+    // setupListNavigation rows) — otherwise focus lands on them instead of
+    // the navigable row, and keyboard nav (arrows / Space / Enter) breaks.
+    const input = $("modal-body").querySelector(
+      'input:not([tabindex="-1"]), textarea:not([tabindex="-1"])'
+    );
     if (input) { input.focus(); return; }
     const navTarget = $("modal-body").querySelector('[tabindex="0"]');
     if (navTarget) { navTarget.focus(); return; }
@@ -730,6 +735,20 @@ function setupListNavigation(container, itemSelector) {
   });
   container.addEventListener("keydown", (e) => {
     const cur = items.indexOf(document.activeElement);
+    // 1-9 numeric accelerator: jump to + toggle the Nth row (matches the
+    // visible row number rendered by ws-pick-list / bookmark wizard).
+    if (/^[1-9]$/.test(e.key)) {
+      const idx = parseInt(e.key) - 1;
+      if (items[idx]) {
+        items[idx].click();
+        if (cur >= 0) items[cur].tabIndex = -1;
+        items[idx].tabIndex = 0;
+        items[idx].focus();
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      return;
+    }
     if (cur < 0) return;
     let next = cur;
     if (e.key === "ArrowDown") next = Math.min(items.length - 1, cur + 1);
