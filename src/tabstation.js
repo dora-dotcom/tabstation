@@ -1199,6 +1199,7 @@ function openHelpModal() {
           <span class="k">← →</span><span>Switch between panels</span>
           <span class="k">Enter</span><span>Open workspace / Jump to tab</span>
           <span class="k">⇧Enter</span><span>SWITCH to workspace (close other tabs first)</span>
+          <span class="k">Space</span><span>Peek inside the selected workspace (preview its tabs, opens nothing)</span>
           <span class="k">a</span><span>Add the selected tab to a workspace (or a brand-new one)</span>
           <span class="k">x / ⌫</span><span>Close the selected tab (or all duplicates if it's a group head)</span>
           <span class="k">1 – 9</span><span>Quick-open workspace #1–9</span>
@@ -1475,6 +1476,16 @@ document.addEventListener("keydown", (e) => {
     } else {
       state.tabIdx = Math.max(0, state.tabIdx - 1);
     }
+    render();
+    e.preventDefault();
+    return;
+  }
+  // Space = peek inside the selected workspace (expand/collapse its URL list)
+  // without opening anything; Enter still opens the whole workspace.
+  if (k === " " && state.focusPanel === "ws" && state.workspaces[state.wsIdx]) {
+    const ws = state.workspaces[state.wsIdx];
+    if (state.expandedWsIds.has(ws.id)) state.expandedWsIds.delete(ws.id);
+    else state.expandedWsIds.add(ws.id);
     render();
     e.preventDefault();
     return;
