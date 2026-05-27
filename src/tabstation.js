@@ -203,8 +203,10 @@ function isTabstationUrl(url) {
   return url && url.startsWith(TABSTATION_URL.split("#")[0]);
 }
 
-function findWorkspaceForUrl(normalized) {
-  return state.workspaces.find((ws) =>
+// All workspaces that contain this (already-normalized) URL — a tab can live
+// in several, so the caller renders one tag per match.
+function findWorkspacesForUrl(normalized) {
+  return state.workspaces.filter((ws) =>
     ws.urls.some((u) => normalizeUrl(u) === normalized)
   );
 }
@@ -512,9 +514,14 @@ function renderTab(t, { isDupChild }) {
 }
 
 function renderWsTag(tab) {
-  const ws = findWorkspaceForUrl(normalizeUrl(tab.url));
-  if (!ws) return "";
-  return `<span class="ws-tag" style="background: var(--coin)" title="${escapeHtml(ws.name)}">${escapeHtml(ws.emoji)} ${escapeHtml(ws.name.slice(0, 8).toUpperCase())}</span>`;
+  const list = findWorkspacesForUrl(normalizeUrl(tab.url));
+  if (list.length === 0) return "";
+  const tags = list
+    .map((ws) =>
+      `<span class="ws-tag" title="${escapeHtml(ws.name)}">${escapeHtml(ws.emoji)} ${escapeHtml(ws.name.toUpperCase())}</span>`
+    )
+    .join("");
+  return `<span class="ws-tags">${tags}</span>`;
 }
 
 function renderRecentlyClosedSection() {
@@ -723,55 +730,69 @@ function setupGridNavigation(container, itemSelector, cols) {
   });
 }
 
+// Items of a nav list (marked by setupListNavigation), in DOM order.
+function navListItems(container) {
+  return [...container.querySelectorAll("[data-navitem]")];
+}
+
+// The "current" row is whichever holds the roving tabindex — tracked
+// independently of document.activeElement, so arrows still work after focus
+// drifts to a button elsewhere in the modal (see the modal branch in KEYBOARD).
+function navListFocus(container, idx) {
+  const items = navListItems(container);
+  if (!items.length) return;
+  const next = Math.max(0, Math.min(items.length - 1, idx));
+  items.forEach((it) => (it.tabIndex = -1));
+  items[next].tabIndex = 0;
+  items[next].focus();
+}
+
+function navListCurrent(container) {
+  const items = navListItems(container);
+  return items.findIndex((it) => it.tabIndex === 0);
+}
+
+function moveNavList(container, delta) {
+  const cur = navListCurrent(container);
+  navListFocus(container, (cur < 0 ? (delta > 0 ? -1 : navListItems(container).length) : cur) + delta);
+}
+
 // Vertical list nav (for bookmark / workspace pick lists): up/down + space toggles
 function setupListNavigation(container, itemSelector) {
   if (!container) return;
   const items = [...container.querySelectorAll(itemSelector)];
   if (items.length === 0) return;
+  container.dataset.navlist = "1";
   items.forEach((it, i) => {
+    it.dataset.navitem = "1";
     it.tabIndex = i === 0 ? 0 : -1;
     // children inside the row shouldn't steal keyboard focus
     it.querySelectorAll("input, button, select").forEach((c) => (c.tabIndex = -1));
   });
   container.addEventListener("keydown", (e) => {
-    const cur = items.indexOf(document.activeElement);
     // 1-9 numeric accelerator: jump to + toggle the Nth row (matches the
     // visible row number rendered by ws-pick-list / bookmark wizard).
     if (/^[1-9]$/.test(e.key)) {
       const idx = parseInt(e.key) - 1;
       if (items[idx]) {
+        navListFocus(container, idx);
         items[idx].click();
-        if (cur >= 0) items[cur].tabIndex = -1;
-        items[idx].tabIndex = 0;
-        items[idx].focus();
         e.preventDefault();
         e.stopPropagation();
       }
       return;
     }
-    if (cur < 0) return;
-    let next = cur;
-    if (e.key === "ArrowDown") next = Math.min(items.length - 1, cur + 1);
-    else if (e.key === "ArrowUp") next = Math.max(0, cur - 1);
+    if (e.key === "ArrowDown") moveNavList(container, +1);
+    else if (e.key === "ArrowUp") moveNavList(container, -1);
     else if (e.key === " ") {
-      items[cur].click();
-      e.preventDefault();
-      e.stopPropagation();
-      return;
+      const cur = navListCurrent(container);
+      if (cur >= 0) items[cur].click();
     } else if (e.key === "Enter") {
       // Enter submits the modal (Space is for selecting/toggling)
-      e.preventDefault();
-      e.stopPropagation();
       $("modal-confirm").click();
-      return;
     } else return;
-    if (next !== cur) {
-      items[cur].tabIndex = -1;
-      items[next].tabIndex = 0;
-      items[next].focus();
-      e.preventDefault();
-      e.stopPropagation();
-    }
+    e.preventDefault();
+    e.stopPropagation();
   });
 }
 
@@ -1382,7 +1403,14 @@ document.addEventListener("keydown", (e) => {
   }
   // modal is open
   if (!$("modal-backdrop").classList.contains("hidden")) {
-    if (e.key === "Escape") { closeModal(); e.preventDefault(); }
+    if (e.key === "Escape") { closeModal(); e.preventDefault(); return; }
+    // Arrows always drive the modal's pick-list, even when focus has drifted
+    // onto a button (the per-list handler stops propagation when a row itself
+    // is focused, so we only reach here when it isn't).
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      const list = $("modal-backdrop").querySelector("[data-navlist]");
+      if (list) { moveNavList(list, e.key === "ArrowDown" ? 1 : -1); e.preventDefault(); }
+    }
     return;
   }
 

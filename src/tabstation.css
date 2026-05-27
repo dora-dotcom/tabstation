@@ -930,12 +930,25 @@ button {
   white-space: nowrap;
 }
 
+/* A tab can belong to several workspaces — show one tag per workspace. */
+.tab-item .ws-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
+  max-width: 220px;
+}
+
 .tab-item .ws-tag {
   font-family: "Press Start 2P", monospace;
   font-size: 7px;
   padding: 3px 5px;
   background: var(--coin);
   border: 1px solid var(--brick-dk);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tab-item .btn-add {
