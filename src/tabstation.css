@@ -1220,6 +1220,34 @@ button {
   box-shadow: inset 0 0 0 1px var(--red);
 }
 
+/* "➕ NEW WORKSPACE" shortcut inside the ADD TO WORKSPACE modal */
+.btn-new-ws-inline {
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 10px;
+  font-family: "Press Start 2P", monospace;
+  font-size: 11px;
+  color: var(--ink);
+  background: var(--coin);
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  cursor: pointer;
+}
+.btn-new-ws-inline:hover { background: var(--coin-hi); }
+.btn-new-ws-inline:active {
+  transform: translate(3px, 3px);
+  box-shadow: none;
+}
+.btn-new-ws-inline:focus {
+  outline: 3px solid var(--red);
+  outline-offset: 2px;
+}
+[data-theme="dark"] .btn-new-ws-inline {
+  color: #000;
+  border-color: #000;
+  box-shadow: 3px 3px 0 #000;
+}
+
 /* emoji picker */
 .emoji-grid {
   display: grid;

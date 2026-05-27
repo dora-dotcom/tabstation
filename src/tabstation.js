@@ -775,8 +775,10 @@ function setupListNavigation(container, itemSelector) {
   });
 }
 
-function openNewWorkspaceModal() {
-  const initial = { name: "", emoji: "🍄", color: "red" };
+// seedUrls pre-fills the new workspace's URLs (e.g. "add this tab to a brand
+// new workspace"); defaultName pre-fills the NAME field (still editable).
+function openNewWorkspaceModal({ seedUrls = [], defaultName = "" } = {}) {
+  const initial = { name: defaultName, emoji: "🍄", color: "red" };
   showModal({
     title: "NEW WORKSPACE",
     bodyHtml: workspaceFormHtml(initial),
@@ -789,14 +791,16 @@ function openNewWorkspaceModal() {
         name,
         emoji: sel.emoji,
         color: sel.color,
-        urls: [],
+        urls: [...seedUrls],
         createdAt: Date.now(),
       };
       state.workspaces.push(ws);
       await saveWorkspaces();
       closeModal();
       sfxOneUp();
-      toast(`1-UP! ${ws.emoji} ${ws.name}`);
+      toast(seedUrls.length
+        ? `1-UP! ${ws.emoji} ${ws.name} +${seedUrls.length} ★`
+        : `1-UP! ${ws.emoji} ${ws.name}`);
       render();
     },
   });
@@ -855,16 +859,19 @@ function openDeleteWorkspaceModal(idx) {
 async function addTabToWorkspace(tabId) {
   const tab = state.tabs.find((t) => t.id === tabId);
   if (!tab) return;
+  // No workspaces yet → skip the picker and go straight to creating one,
+  // seeded with this tab (name pre-filled with its domain, still editable).
   if (state.workspaces.length === 0) {
-    toast("CREATE A WORKSPACE FIRST");
+    openNewWorkspaceModal({ seedUrls: [tab.url], defaultName: domainOf(tab.url) });
     return;
   }
   showModal({
     title: "ADD TO WORKSPACE",
     bodyHtml: `
       <p style="margin-bottom:12px; font-size:18px;">${escapeHtml(tab.title || tab.url)}</p>
+      <button type="button" class="btn-new-ws-inline" id="ws-pick-new">➕ NEW WORKSPACE…</button>
       <div class="field">
-        <label>SELECT WORKSPACE</label>
+        <label>OR ADD TO EXISTING</label>
         <div id="ws-pick-list">
           ${state.workspaces
             .map((ws, i) => `
@@ -892,6 +899,11 @@ async function addTabToWorkspace(tabId) {
       toast(`+${picks.length} ★`);
       render();
     },
+  });
+  // "➕ NEW WORKSPACE" → swap to the create flow, seeded with this tab.
+  $("ws-pick-new").addEventListener("click", () => {
+    closeModal();
+    openNewWorkspaceModal({ seedUrls: [tab.url], defaultName: domainOf(tab.url) });
   });
   // toggle selection on click
   $("ws-pick-list").addEventListener("click", (e) => {
@@ -1069,7 +1081,7 @@ async function removeUrlFromWorkspace(wsId, url) {
 // EVENT WIRING
 // ============================================================
 
-$("btn-new-workspace").addEventListener("click", openNewWorkspaceModal);
+$("btn-new-workspace").addEventListener("click", () => openNewWorkspaceModal());
 $("btn-help").addEventListener("click", openHelpModal);
 $("btn-theme").addEventListener("click", toggleTheme);
 $("btn-sound").addEventListener("click", toggleSound);
@@ -1166,7 +1178,7 @@ function openHelpModal() {
           <span class="k">← →</span><span>Switch between panels</span>
           <span class="k">Enter</span><span>Open workspace / Jump to tab</span>
           <span class="k">⇧Enter</span><span>SWITCH to workspace (close other tabs first)</span>
-          <span class="k">a</span><span>Add the selected tab to a workspace</span>
+          <span class="k">a</span><span>Add the selected tab to a workspace (or a brand-new one)</span>
           <span class="k">x / ⌫</span><span>Close the selected tab (or all duplicates if it's a group head)</span>
           <span class="k">1 – 9</span><span>Quick-open workspace #1–9</span>
           <span class="k">n</span><span>New workspace</span>
