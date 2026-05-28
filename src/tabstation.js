@@ -25,6 +25,7 @@ const state = {
   workspaces: [],
   settings: { firstLaunchDone: false, view: "window", theme: "auto", soundOn: true },
   tabs: [],
+  tabGroups: [],
   windows: [],
   focusPanel: "ws", // 'ws' | 'tabs'
   wsIdx: 0,
@@ -222,8 +223,12 @@ function escapeHtml(s) {
 // ============================================================
 
 async function refreshTabs() {
-  const tabs = await chrome.tabs.query({});
+  const [tabs, groups] = await Promise.all([
+    chrome.tabs.query({}),
+    chrome.tabGroups ? chrome.tabGroups.query({}).catch(() => []) : Promise.resolve([]),
+  ]);
   state.tabs = tabs.filter((t) => !isTabstationUrl(t.url));
+  state.tabGroups = groups;
   state.windows = [...new Set(state.tabs.map((t) => t.windowId))];
 }
 
@@ -276,6 +281,14 @@ function renderStats() {
     cleanupBtn.style.display = orphanN > 0 ? "" : "none";
     $("orphan-count").textContent = orphanN;
     cleanupBtn.title = `Close ${orphanN} orphan tab(s) (not in any workspace)`;
+  }
+  // Update organize button visibility based on actionable tab count
+  const organizeN = estimateOrganizeCount();
+  const organizeBtn = $("btn-organize");
+  if (organizeBtn) {
+    organizeBtn.style.display = organizeN > 0 ? "" : "none";
+    $("organize-count").textContent = organizeN;
+    organizeBtn.title = `Organize ${organizeN} tab(s) into workspace groups · remove duplicates (o)`;
   }
 }
 
@@ -369,7 +382,7 @@ function renderTabs() {
   ul.innerHTML = mainHtml + renderRecentlyClosedSection();
   // Collect navigable items: regular tabs → recent-section header → (if expanded) recent items
   state.navTabs = [];
-  ul.querySelectorAll(".tab-item, .recent-header, .domain-header, .window-header").forEach((el) => {
+  ul.querySelectorAll(".tab-item, .recent-header, .domain-header, .window-header, .group-header").forEach((el) => {
     if (el.classList.contains("recent-header")) {
       state.navTabs.push({ kind: "recent-header" });
       return;
@@ -380,6 +393,14 @@ function renderTabs() {
     }
     if (el.classList.contains("window-header")) {
       state.navTabs.push({ kind: "window-header", windowId: parseInt(el.dataset.windowId) });
+      return;
+    }
+    if (el.classList.contains("group-header")) {
+      state.navTabs.push({
+        kind: "group-header",
+        groupId: parseInt(el.dataset.groupId),
+        windowId: parseInt(el.dataset.windowId),
+      });
       return;
     }
     const dupChildren = el.closest(".dup-children");
@@ -402,6 +423,7 @@ function renderTabs() {
     if (sel.kind === "recent-header") selEl = ul.querySelector(".recent-header");
     else if (sel.kind === "domain-header") selEl = ul.querySelector(`.domain-header[data-domain="${CSS.escape(sel.domain)}"]`);
     else if (sel.kind === "window-header") selEl = ul.querySelector(`.window-header[data-window-id="${sel.windowId}"]`);
+    else if (sel.kind === "group-header") selEl = ul.querySelector(`.group-header[data-group-id="${sel.groupId}"][data-window-id="${sel.windowId}"]`);
     else if (sel.kind === "recent") selEl = ul.querySelector(`.recent-closed-item[data-session-id="${CSS.escape(sel.id)}"]`);
     else selEl = ul.querySelector(`.tab-item[data-tab-id="${sel.id}"]:not(.recent-closed-item)`);
     if (selEl) {
@@ -416,20 +438,112 @@ function renderWindowGroup(winId, i) {
   const closeAllBtn = tabs.length > 1
     ? `<button class="btn-close-domain" data-action="close-window" data-window-id="${winId}" title="Close all ${tabs.length} tabs in this window">× ALL</button>`
     : "";
-  const groups = groupByNormalizedUrl(tabs);
+
+  // Partition tabs by Chrome group id (-1 == ungrouped)
+  const tabsByGroupId = new Map();
+  for (const t of tabs) {
+    const gid = t.groupId == null || t.groupId === -1 ? -1 : t.groupId;
+    if (!tabsByGroupId.has(gid)) tabsByGroupId.set(gid, []);
+    tabsByGroupId.get(gid).push(t);
+  }
+
+  // Map: workspace title → { ws, idx }
+  const wsByTitle = new Map();
+  state.workspaces.forEach((ws, idx) => {
+    wsByTitle.set(`${ws.emoji} ${ws.name}`, { ws, idx });
+  });
+
+  const groupById = new Map(state.tabGroups.map((g) => [g.id, g]));
+
+  // Iterate the groupIds actually present in this window's tabs, so a tab
+  // whose group metadata is briefly missing from state still gets rendered
+  // (falls through to a manual-section header).
+  const tabstationSections = [];
+  const manualSections = [];
+  for (const [gid, gTabs] of tabsByGroupId) {
+    if (gid === -1) continue;
+    const g = groupById.get(gid);
+    const info = g ? wsByTitle.get(g.title) : null;
+    if (info) {
+      tabstationSections.push({
+        kind: "tabstation",
+        title: `${info.ws.emoji} ${info.ws.name.toUpperCase()}`,
+        color: info.ws.color,
+        tabs: gTabs,
+        groupId: gid,
+        windowId: winId,
+        wsOrder: info.idx,
+      });
+    } else {
+      manualSections.push({
+        kind: "manual",
+        title: ((g && g.title) || "GROUP").toUpperCase(),
+        color: null,
+        tabs: gTabs,
+        groupId: gid,
+        windowId: winId,
+      });
+    }
+  }
+  tabstationSections.sort((a, b) => a.wsOrder - b.wsOrder);
+
+  // Truly ungrouped tabs
+  const ungroupedTabs = tabsByGroupId.get(-1) || [];
+  const ungroupedSection = ungroupedTabs.length > 0 ? [{
+    kind: "ungrouped",
+    title: "· UNGROUPED",
+    color: null,
+    tabs: ungroupedTabs,
+    groupId: -1,
+    windowId: winId,
+  }] : [];
+
+  const sections = [...tabstationSections, ...manualSections, ...ungroupedSection];
+  const sectionsHtml = sections.map(renderGroupSection).join("");
+
   return `
     <li class="window-group">
       <div class="window-group-header window-header" data-nav="window-header" data-window-id="${winId}" tabindex="0">
         <span>WINDOW ${i + 1} (${tabs.length})</span>
         ${closeAllBtn}
       </div>
-      ${groups.map((g) => renderTabGroup(g)).join("")}
+      ${sectionsHtml}
     </li>`;
+}
+
+function renderGroupSection(sec) {
+  const groups = groupByNormalizedUrl(sec.tabs);
+  const colorClass = sec.color ? `color-${sec.color}` : "";
+  const closeAllBtn = sec.tabs.length > 0
+    ? `<button class="btn-close-domain" data-action="close-group" data-group-id="${sec.groupId}" data-window-id="${sec.windowId}" title="Close all ${sec.tabs.length} tab(s) in this section">× ALL</button>`
+    : "";
+  const hideWsTag = sec.kind === "tabstation";
+  return `
+    <div class="window-group-header group-header ${colorClass}" data-nav="group-header" data-group-id="${sec.groupId}" data-window-id="${sec.windowId}" tabindex="0">
+      <span>${escapeHtml(sec.title)} (${sec.tabs.length})</span>
+      ${closeAllBtn}
+    </div>
+    ${groups.map((g) => renderTabGroup(g, { hideWsTag })).join("")}
+  `;
 }
 
 async function closeWindowTabs(windowId) {
   const ids = state.tabs
     .filter((t) => t.windowId === windowId && !t.pinned)
+    .map((t) => t.id);
+  if (ids.length === 0) return;
+  await chrome.tabs.remove(ids);
+  sfxClose();
+  toast(`CLOSED ${ids.length} TABS`);
+}
+
+async function closeGroupTabs(windowId, groupId) {
+  const ids = state.tabs
+    .filter((t) => t.windowId === windowId && !t.pinned && (
+      groupId === -1
+        ? (t.groupId == null || t.groupId === -1)
+        : t.groupId === groupId
+    ))
     .map((t) => t.id);
   if (ids.length === 0) return;
   await chrome.tabs.remove(ids);
@@ -481,33 +595,35 @@ function groupByNormalizedUrl(tabs) {
   return [...map.entries()].map(([key, tabs]) => ({ key, tabs }));
 }
 
-function renderTabGroup({ key, tabs }) {
+function renderTabGroup({ key, tabs }, opts = {}) {
   if (tabs.length === 1) {
-    return renderTab(tabs[0], { isDupChild: false });
+    return renderTab(tabs[0], { isDupChild: false, ...opts });
   }
   const expanded = state.expandedDupKeys.has(key);
   const head = tabs[0];
+  const wsTagHtml = opts.hideWsTag ? "" : (renderWsTag(head) || '<span class="ws-tag-spacer"></span>');
   return `
     <div class="dup-group ${expanded ? "expanded" : ""}" data-dup-key="${escapeHtml(key)}">
       <div class="tab-item dup-head" data-tab-id="${head.id}" data-dup-toggle="${escapeHtml(key)}">
         ${faviconImg(tabFaviconUrl(head))}
         <span class="tab-title">${escapeHtml(head.title || head.url)} (${tabs.length})</span>
-        ${renderWsTag(head) || '<span class="ws-tag-spacer"></span>'}
+        ${wsTagHtml}
         <button class="btn-add" data-action="add-tab" data-tab-id="${head.id}" title="Add to workspace">+</button>
         <button class="btn-close" data-action="close-dup" data-dup-key="${escapeHtml(key)}" title="Close all ${tabs.length} duplicates">×${tabs.length}</button>
       </div>
       <div class="dup-children">
-        ${tabs.map((t) => renderTab(t, { isDupChild: true })).join("")}
+        ${tabs.map((t) => renderTab(t, { isDupChild: true, ...opts })).join("")}
       </div>
     </div>`;
 }
 
-function renderTab(t, { isDupChild }) {
+function renderTab(t, { isDupChild, hideWsTag = false }) {
+  const wsTagHtml = hideWsTag ? "" : (renderWsTag(t) || '<span class="ws-tag-spacer"></span>');
   return `
     <div class="tab-item ${isDupChild ? "dup-child" : ""}" data-tab-id="${t.id}">
       ${faviconImg(tabFaviconUrl(t))}
       <span class="tab-title">${escapeHtml(t.title || t.url)}</span>
-      ${renderWsTag(t) || '<span class="ws-tag-spacer"></span>'}
+      ${wsTagHtml}
       <button class="btn-add" data-action="add-tab" data-tab-id="${t.id}" title="Add to workspace">+</button>
       <button class="btn-close" data-action="close-tab" data-tab-id="${t.id}" title="Close tab">×</button>
     </div>`;
@@ -637,6 +753,34 @@ $("modal-confirm").addEventListener("click", () => {
   if (modalState.onConfirm) modalState.onConfirm();
 });
 
+// Footer buttons participate in the modal's ↑/↓/←/→ flow:
+//   ← / →  swap between CANCEL and CONFIRM
+//   ↑      bridge back into the form's last section (color grid or nav list)
+//   ↓      no-op when there's a section above (we're at the bottom of flow);
+//          stops propagation so the global modal arrow handler doesn't bounce
+//          focus back to the top of a navlist.
+// Enter is intentionally left to native button activation — focus is the
+// authority, so whichever button is focused gets clicked.
+function modalFooterKeydown(e) {
+  const btn = e.currentTarget;
+  if (e.key === "ArrowLeft" && btn.id === "modal-confirm") {
+    $("modal-cancel").focus(); e.preventDefault(); e.stopPropagation();
+  } else if (e.key === "ArrowRight" && btn.id === "modal-cancel") {
+    $("modal-confirm").focus(); e.preventDefault(); e.stopPropagation();
+  } else if (e.key === "ArrowUp") {
+    const colorGrid = $("modal-body").querySelector(".color-grid");
+    const navList = $("modal-body").querySelector("[data-navlist]");
+    if (colorGrid) { focusGridRoving(colorGrid); e.preventDefault(); e.stopPropagation(); }
+    else if (navList) { focusNavListRoving(navList); e.preventDefault(); e.stopPropagation(); }
+  } else if (e.key === "ArrowDown") {
+    if ($("modal-body").querySelector(".color-grid, [data-navlist]")) {
+      e.preventDefault(); e.stopPropagation();
+    }
+  }
+}
+$("modal-cancel").addEventListener("keydown", modalFooterKeydown);
+$("modal-confirm").addEventListener("keydown", modalFooterKeydown);
+
 // ============================================================
 // WORKSPACE CRUD
 // ============================================================
@@ -660,7 +804,7 @@ function workspaceFormHtml(ws = { name: "", emoji: "🍄", color: "red" }) {
       </div>
     </div>
     <p style="font-size: 14px; color: var(--brick-dk); margin-top: -4px;">
-      Tab between sections · ← → ↑ ↓ navigate · Space picks · Enter saves
+      ↑ ↓ ← → navigate · Space picks · Enter saves
     </p>
   `;
 }
@@ -681,14 +825,31 @@ function attachWorkspaceFormHandlers(initial) {
     sw.classList.add("selected");
     sel.color = sw.dataset.color;
   });
-  setupGridNavigation($("emoji-grid"), "[data-emoji]", 8);
-  setupGridNavigation($("color-grid"), "[data-color]", 8);
+  // ↑/↓ flow across NAME → EMOJI → COLOR so the user never needs Tab.
+  // ←/→ stay scoped to each grid (rows wrap naturally inside the grid).
+  setupGridNavigation($("emoji-grid"), "[data-emoji]", 8, {
+    onUpOut: () => $("ws-name-input").focus(),
+    onDownOut: () => focusGridRoving($("color-grid")),
+  });
+  setupGridNavigation($("color-grid"), "[data-color]", 8, {
+    onUpOut: () => focusGridRoving($("emoji-grid")),
+    onDownOut: () => $("modal-confirm").focus(),
+  });
+  $("ws-name-input").addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      focusGridRoving($("emoji-grid"));
+    }
+  });
   return sel;
 }
 
 // Roving-tabindex helper: arrow keys move focus within a grid container.
 // Selector matches the navigable items. cols is how many per row.
-function setupGridNavigation(container, itemSelector, cols) {
+// opts.onUpOut / onDownOut fire when ArrowUp/Down would otherwise clamp at the
+// top/bottom row — used to chain grids together so ↑/↓ flows across sections
+// without needing Tab.
+function setupGridNavigation(container, itemSelector, cols, opts = {}) {
   if (!container) return;
   const items = [...container.querySelectorAll(itemSelector)];
   if (items.length === 0) return;
@@ -704,8 +865,22 @@ function setupGridNavigation(container, itemSelector, cols) {
     switch (e.key) {
       case "ArrowLeft":  next = Math.max(0, cur - 1); break;
       case "ArrowRight": next = Math.min(items.length - 1, cur + 1); break;
-      case "ArrowUp":    next = Math.max(0, cur - cols); break;
-      case "ArrowDown":  next = Math.min(items.length - 1, cur + cols); break;
+      case "ArrowUp": {
+        const target = cur - cols;
+        if (target < 0 && opts.onUpOut) {
+          opts.onUpOut(); e.preventDefault(); e.stopPropagation(); return;
+        }
+        next = Math.max(0, target);
+        break;
+      }
+      case "ArrowDown": {
+        const target = cur + cols;
+        if (target > items.length - 1 && opts.onDownOut) {
+          opts.onDownOut(); e.preventDefault(); e.stopPropagation(); return;
+        }
+        next = Math.min(items.length - 1, target);
+        break;
+      }
       case " ":
         items[cur].click();
         e.preventDefault();
@@ -728,6 +903,13 @@ function setupGridNavigation(container, itemSelector, cols) {
       e.stopPropagation();
     }
   });
+}
+
+// Focus whichever item in a grid currently holds the roving tabindex
+// (i.e. the user's last position / selection) — used by cross-section bridges.
+function focusGridRoving(container) {
+  const target = container && container.querySelector('[tabindex="0"]');
+  if (target) target.focus();
 }
 
 // Items of a nav list (marked by setupListNavigation), in DOM order.
@@ -758,7 +940,9 @@ function moveNavList(container, delta) {
 }
 
 // Vertical list nav (for bookmark / workspace pick lists): up/down + space toggles
-function setupListNavigation(container, itemSelector) {
+// opts.onUpOut / onDownOut bridge focus out of the list when ↑/↓ would
+// otherwise clamp at the first/last row (same pattern as setupGridNavigation).
+function setupListNavigation(container, itemSelector, opts = {}) {
   if (!container) return;
   const items = [...container.querySelectorAll(itemSelector)];
   if (items.length === 0) return;
@@ -770,30 +954,53 @@ function setupListNavigation(container, itemSelector) {
     it.querySelectorAll("input, button, select").forEach((c) => (c.tabIndex = -1));
   });
   container.addEventListener("keydown", (e) => {
-    // 1-9 numeric accelerator: jump to + toggle the Nth row (matches the
-    // visible row number rendered by ws-pick-list / bookmark wizard).
+    // 1-9 numeric accelerator: target visibly-numbered .bookmark-folder rows
+    // (the ADD TO WORKSPACE picker also has a + NEW WORKSPACE button in the
+    // navlist, which has no number badge and must not steal "1").
     if (/^[1-9]$/.test(e.key)) {
       const idx = parseInt(e.key) - 1;
-      if (items[idx]) {
-        navListFocus(container, idx);
-        items[idx].click();
+      const numbered = [...container.querySelectorAll(".bookmark-folder")];
+      const target = numbered[idx];
+      if (target) {
+        navListFocus(container, items.indexOf(target));
+        target.click();
         e.preventDefault();
         e.stopPropagation();
       }
       return;
     }
-    if (e.key === "ArrowDown") moveNavList(container, +1);
-    else if (e.key === "ArrowUp") moveNavList(container, -1);
-    else if (e.key === " ") {
+    if (e.key === "ArrowDown") {
+      const cur = navListCurrent(container);
+      if (cur === items.length - 1 && opts.onDownOut) {
+        opts.onDownOut(); e.preventDefault(); e.stopPropagation(); return;
+      }
+      moveNavList(container, +1);
+    } else if (e.key === "ArrowUp") {
+      const cur = navListCurrent(container);
+      if (cur === 0 && opts.onUpOut) {
+        opts.onUpOut(); e.preventDefault(); e.stopPropagation(); return;
+      }
+      moveNavList(container, -1);
+    } else if (e.key === " ") {
       const cur = navListCurrent(container);
       if (cur >= 0) items[cur].click();
     } else if (e.key === "Enter") {
-      // Enter submits the modal (Space is for selecting/toggling)
-      $("modal-confirm").click();
+      // On a button row (e.g. + NEW WORKSPACE), Enter activates it. On a
+      // selectable row, Enter submits the modal (Space toggles selection).
+      const cur = navListCurrent(container);
+      const curEl = cur >= 0 ? items[cur] : null;
+      if (curEl && curEl.tagName === "BUTTON") curEl.click();
+      else $("modal-confirm").click();
     } else return;
     e.preventDefault();
     e.stopPropagation();
   });
+}
+
+// Focus whichever row in a navlist currently holds the roving tabindex.
+function focusNavListRoving(container) {
+  const target = container && container.querySelector('[data-navitem][tabindex="0"]');
+  if (target) target.focus();
 }
 
 // seedUrls pre-fills the new workspace's URLs (e.g. "add this tab to a brand
@@ -890,17 +1097,19 @@ async function addTabToWorkspace(tabId) {
     title: "ADD TO WORKSPACE",
     bodyHtml: `
       <p style="margin-bottom:12px; font-size:18px;">${escapeHtml(tab.title || tab.url)}</p>
-      <button type="button" class="btn-new-ws-inline" id="ws-pick-new">➕ NEW WORKSPACE…</button>
-      <div class="field">
-        <label>OR ADD TO EXISTING</label>
-        <div id="ws-pick-list">
-          ${state.workspaces
-            .map((ws, i) => `
-              <div class="bookmark-folder" data-ws-id="${ws.id}">
-                <input type="checkbox">
-                <span class="folder-name">${escapeHtml(ws.emoji)} ${escapeHtml(ws.name)}</span>
-                <span class="folder-count">${i < 9 ? i + 1 : ""}</span>
-              </div>`).join("")}
+      <div id="ws-pick-wrap">
+        <button type="button" class="btn-new-ws-inline" id="ws-pick-new">➕ NEW WORKSPACE…</button>
+        <div class="field">
+          <label>OR ADD TO EXISTING</label>
+          <div id="ws-pick-list">
+            ${state.workspaces
+              .map((ws, i) => `
+                <div class="bookmark-folder" data-ws-id="${ws.id}">
+                  <input type="checkbox">
+                  <span class="folder-name">${escapeHtml(ws.emoji)} ${escapeHtml(ws.name)}</span>
+                  <span class="folder-count">${i < 9 ? i + 1 : ""}</span>
+                </div>`).join("")}
+          </div>
         </div>
       </div>`,
     confirmText: "ADD",
@@ -933,7 +1142,17 @@ async function addTabToWorkspace(tabId) {
     row.classList.toggle("selected");
     row.querySelector("input").checked = row.classList.contains("selected");
   });
-  setupListNavigation($("ws-pick-list"), ".bookmark-folder");
+  // Nav includes the + NEW WORKSPACE button so Up from the first row reaches
+  // it. Roving tabindex starts on the first workspace row (not the button),
+  // so opening the modal still lands on a selectable row.
+  setupListNavigation($("ws-pick-wrap"), "#ws-pick-new, .bookmark-folder", {
+    onDownOut: () => $("modal-confirm").focus(),
+  });
+  const firstRow = $("ws-pick-wrap").querySelector(".bookmark-folder");
+  if (firstRow) {
+    $("ws-pick-new").tabIndex = -1;
+    firstRow.tabIndex = 0;
+  }
 }
 
 function switchToWorkspace(wsId) {
@@ -1099,6 +1318,330 @@ async function removeUrlFromWorkspace(wsId, url) {
 }
 
 // ============================================================
+// ORGANIZE: snap open tabs into workspace groups + dedupe
+// ============================================================
+
+// Cheap synchronous count for the topbar badge. Overcounts slightly — fine
+// for a badge, the actual modal recomputes precisely with async group info.
+function estimateOrganizeCount() {
+  const candidates = state.tabs.filter(
+    (t) => !t.pinned && !isTabstationUrl(t.url)
+  );
+  const byNorm = new Map();
+  for (const t of candidates) {
+    const k = normalizeUrl(t.url);
+    if (!byNorm.has(k)) byNorm.set(k, []);
+    byNorm.get(k).push(t);
+  }
+  let dupN = 0;
+  for (const tabs of byNorm.values()) if (tabs.length > 1) dupN += tabs.length - 1;
+  let ungroupedMatchN = 0;
+  let misplacedN = 0;
+  for (const t of candidates) {
+    const inGroup = t.groupId != null && t.groupId !== -1;
+    const matches = findWorkspacesForUrl(normalizeUrl(t.url)).length > 0;
+    if (matches && !inGroup) ungroupedMatchN++;
+    // Approximation: tab is in some group AND matches no workspace → likely
+    // a misplaced tab inside a Tabstation group. Overcounts when the group
+    // is actually a user-managed (non-Tabstation) group.
+    if (!matches && inGroup) misplacedN++;
+  }
+  return dupN + ungroupedMatchN + misplacedN;
+}
+
+// Returns { groupsByWs, dups, activeGroupsByWsId, toEject }
+async function getOrganizePlan() {
+  const candidates = state.tabs.filter(
+    (t) => !t.pinned && !isTabstationUrl(t.url)
+  );
+
+  // Dedupe by normalized URL — keep active tab, else lowest tab.id (oldest)
+  const byNorm = new Map();
+  for (const t of candidates) {
+    const k = normalizeUrl(t.url);
+    if (!byNorm.has(k)) byNorm.set(k, []);
+    byNorm.get(k).push(t);
+  }
+  const dups = new Map();
+  const survivors = [];
+  for (const [k, tabs] of byNorm) {
+    if (tabs.length === 1) { survivors.push(tabs[0]); continue; }
+    const active = tabs.find((t) => t.active);
+    const keep = active || tabs.reduce((a, b) => (a.id < b.id ? a : b));
+    dups.set(k, { keep, close: tabs.filter((t) => t.id !== keep.id) });
+    survivors.push(keep);
+  }
+
+  // One query for all Chrome tab groups — derive active-per-ws and id→ws lookups
+  let allGroups = [];
+  if (chrome.tabGroups) {
+    try { allGroups = await chrome.tabGroups.query({}); } catch {}
+  }
+  const wsByGroupId = new Map();
+  const titleToWs = new Map();
+  for (const ws of state.workspaces) titleToWs.set(`${ws.emoji} ${ws.name}`, ws);
+  for (const g of allGroups) {
+    const ws = titleToWs.get(g.title);
+    if (ws) wsByGroupId.set(g.id, ws);
+  }
+  const activeGroupsByWsId = new Map();
+  for (const ws of state.workspaces) {
+    const title = `${ws.emoji} ${ws.name}`;
+    const matches = allGroups.filter((g) => g.title === title);
+    if (matches.length === 0) continue;
+    const best = matches.find((g) => g.color === CHROME_TG_COLORS[ws.color]) || matches[0];
+    activeGroupsByWsId.set(ws.id, best);
+  }
+
+  // Per-workspace match counts (over survivors) — used as the context tiebreak
+  const matchCountsByWsId = new Map();
+  for (const t of survivors) {
+    for (const ws of findWorkspacesForUrl(normalizeUrl(t.url))) {
+      matchCountsByWsId.set(ws.id, (matchCountsByWsId.get(ws.id) || 0) + 1);
+    }
+  }
+
+  // Assign each survivor to one workspace (or mark as orphan)
+  const groupsByWs = new Map();
+  const orphans = [];
+  for (const t of survivors) {
+    const matches = findWorkspacesForUrl(normalizeUrl(t.url));
+    if (matches.length === 0) { orphans.push(t); continue; }
+    const ws = pickWorkspaceFor(matches, matchCountsByWsId, activeGroupsByWsId);
+    if (!groupsByWs.has(ws.id)) groupsByWs.set(ws.id, []);
+    groupsByWs.get(ws.id).push(t);
+  }
+
+  // Misplaced: orphan tabs currently stuck inside a Tabstation group
+  // (e.g. user clicked a link from a workspace tab — Chrome put the new tab
+  // in that group, but the URL isn't on the workspace's list).
+  const toEject = orphans.filter((t) => wsByGroupId.has(t.groupId));
+
+  return { groupsByWs, dups, activeGroupsByWsId, toEject };
+}
+
+// Context-aware tiebreak: existing-group > most-matches > list order
+function pickWorkspaceFor(candidates, matchCountsByWsId, activeGroupsByWsId) {
+  const withActive = candidates.filter((w) => activeGroupsByWsId.has(w.id));
+  if (withActive.length === 1) return withActive[0];
+  const pool = withActive.length > 1 ? withActive : candidates;
+  let best = pool[0];
+  let bestN = matchCountsByWsId.get(best.id) || 0;
+  for (const w of pool.slice(1)) {
+    const n = matchCountsByWsId.get(w.id) || 0;
+    if (n > bestN) { best = w; bestN = n; }
+  }
+  return best;
+}
+
+// Filter out tabs that are already in the correct group — no-ops
+function diffPlanAgainstReality(plan) {
+  const { groupsByWs, dups, activeGroupsByWsId, toEject } = plan;
+  const groupsToApply = new Map();
+  for (const [wsId, tabs] of groupsByWs) {
+    const existing = activeGroupsByWsId.get(wsId);
+    const expectedGroupId = existing ? existing.id : null;
+    const needs = tabs.filter(
+      (t) => expectedGroupId == null || t.groupId !== expectedGroupId
+    );
+    if (needs.length) groupsToApply.set(wsId, needs);
+  }
+  return { groupsToApply, dups, toEject: toEject || [] };
+}
+
+async function pickTargetWindowFor(wsId, tabs, activeGroupsByWsId) {
+  const existing = activeGroupsByWsId.get(wsId);
+  if (existing) return existing.windowId;
+  const byWin = new Map();
+  for (const t of tabs) byWin.set(t.windowId, (byWin.get(t.windowId) || 0) + 1);
+  if (byWin.size > 0) {
+    let bestWin = null, bestN = -1;
+    for (const [w, n] of byWin) if (n > bestN) { bestWin = w; bestN = n; }
+    return bestWin;
+  }
+  const cur = await chrome.windows.getCurrent();
+  return cur.id;
+}
+
+async function executeOrganize(diff, activeGroupsByWsId) {
+  // Eject misplaced tabs (orphans currently stuck inside a Tabstation group)
+  if (diff.toEject.length) {
+    try {
+      await chrome.tabs.ungroup(diff.toEject.map((t) => t.id));
+    } catch (err) {
+      console.warn("organize: ungroup failed", err);
+    }
+  }
+
+  // Close duplicates
+  const dupCloseIds = [];
+  for (const { close } of diff.dups.values()) {
+    for (const t of close) dupCloseIds.push(t.id);
+  }
+  if (dupCloseIds.length) await chrome.tabs.remove(dupCloseIds);
+
+  // Consolidate + group per workspace
+  for (const [wsId, tabs] of diff.groupsToApply) {
+    if (tabs.length === 0) continue;
+    const ws = state.workspaces.find((w) => w.id === wsId);
+    if (!ws) continue;
+
+    const targetWin = await pickTargetWindowFor(wsId, tabs, activeGroupsByWsId);
+
+    const toMove = tabs.filter((t) => t.windowId !== targetWin).map((t) => t.id);
+    if (toMove.length) {
+      await chrome.tabs.move(toMove, { windowId: targetWin, index: -1 });
+    }
+
+    const tabIds = tabs.map((t) => t.id);
+    const existing = activeGroupsByWsId.get(wsId);
+    try {
+      if (existing) {
+        await chrome.tabs.group({ tabIds, groupId: existing.id });
+      } else {
+        const groupId = await chrome.tabs.group({
+          tabIds,
+          createProperties: { windowId: targetWin },
+        });
+        await chrome.tabGroups.update(groupId, {
+          title: `${ws.emoji} ${ws.name}`,
+          color: CHROME_TG_COLORS[ws.color] || "grey",
+        });
+      }
+    } catch (err) {
+      console.warn("organize: group failed for", ws.name, err);
+    }
+  }
+
+  // Slide every Tabstation group to the front of its window, in workspace
+  // order. Process all windows that contain any Tabstation group — not just
+  // the ones we just modified — so groups that were already in place still
+  // get reordered if other groups slid in around them.
+  await consolidateAllWorkspaceGroups();
+}
+
+async function consolidateAllWorkspaceGroups() {
+  if (!chrome.tabGroups) return;
+
+  const orderByTitle = new Map();
+  state.workspaces.forEach((ws, i) => {
+    orderByTitle.set(`${ws.emoji} ${ws.name}`, i);
+  });
+
+  let allGroups;
+  try {
+    allGroups = await chrome.tabGroups.query({});
+  } catch { return; }
+
+  const byWindow = new Map();
+  for (const g of allGroups) {
+    const idx = orderByTitle.get(g.title);
+    if (idx == null) continue; // ignore non-Tabstation groups
+    if (!byWindow.has(g.windowId)) byWindow.set(g.windowId, []);
+    byWindow.get(g.windowId).push({ g, idx });
+  }
+
+  for (const [winId, groups] of byWindow) {
+    groups.sort((a, b) => a.idx - b.idx);
+
+    let pinnedCount = 0;
+    try {
+      const pinned = await chrome.tabs.query({ windowId: winId, pinned: true });
+      pinnedCount = pinned.length;
+    } catch {}
+
+    // Forward iteration with a cumulative target index. Each move places a
+    // group starting at `target`; after the move, advance `target` by that
+    // group's tab count so the next group lands immediately after it.
+    let target = pinnedCount;
+    for (const { g } of groups) {
+      try {
+        await chrome.tabGroups.move(g.id, { index: target });
+        const groupTabs = await chrome.tabs.query({ groupId: g.id });
+        target += groupTabs.length;
+      } catch (err) {
+        console.warn("organize: reorder failed for", g.title, err);
+      }
+    }
+  }
+}
+
+async function organizeTabs() {
+  const plan = await getOrganizePlan();
+  const diff = diffPlanAgainstReality(plan);
+  const groupN = [...diff.groupsToApply.values()].reduce((n, ts) => n + ts.length, 0);
+  const dupN = [...diff.dups.values()].reduce((n, d) => n + d.close.length, 0);
+  const ejectN = diff.toEject.length;
+
+  if (groupN === 0 && dupN === 0 && ejectN === 0) {
+    toast("ALREADY ORGANIZED");
+    return;
+  }
+
+  const groupRows = [...diff.groupsToApply.entries()].map(([wsId, tabs]) => {
+    const ws = state.workspaces.find((w) => w.id === wsId);
+    return `<div style="font-size:14px; padding:2px 8px;">
+      <span class="ws-emoji">${escapeHtml(ws.emoji)}</span>
+      <strong>${escapeHtml(ws.name.toUpperCase())}</strong>
+      <span style="opacity:0.7;">  ←  ${tabs.length} tab${tabs.length !== 1 ? "s" : ""}</span>
+    </div>`;
+  }).join("");
+
+  const dupRows = [...diff.dups.entries()].map(([k, d]) => {
+    const display = (d.keep.title || k).slice(0, 60);
+    return `<div style="font-size:13px; padding:1px 8px; opacity:0.8;">
+      · ${escapeHtml(display)} <span style="opacity:0.6;">(×${d.close.length + 1} → keep 1)</span>
+    </div>`;
+  }).join("");
+
+  const ejectRows = diff.toEject.map((t) => {
+    const display = (t.title || t.url).slice(0, 60);
+    return `<div style="font-size:13px; padding:1px 8px; opacity:0.8;">
+      · ${escapeHtml(display)}
+    </div>`;
+  }).join("");
+
+  const summary = [
+    groupN > 0 ? `Group <strong>${groupN}</strong> tab${groupN !== 1 ? "s" : ""} into <strong>${diff.groupsToApply.size}</strong> workspace${diff.groupsToApply.size !== 1 ? "s" : ""}` : null,
+    dupN > 0 ? `Close <strong>${dupN}</strong> duplicate tab${dupN !== 1 ? "s" : ""}` : null,
+    ejectN > 0 ? `Ungroup <strong>${ejectN}</strong> misplaced tab${ejectN !== 1 ? "s" : ""}` : null,
+  ].filter(Boolean).join(" · ");
+
+  showModal({
+    title: "ORGANIZE TABS?",
+    bodyHtml: `
+      <p style="text-align:center; padding:10px 0; font-size:17px;">${summary}</p>
+      <p style="text-align:center; font-size:13px; color: var(--brick-dk); margin-bottom:6px;">
+        (Tabs may move between windows · Pinned tabs are kept · Closed dupes restorable from RECENTLY CLOSED)
+      </p>
+      ${groupRows ? `<div style="max-height:16vh; overflow-y:auto; margin-top:8px;">${groupRows}</div>` : ""}
+      ${dupRows ? `
+        <p style="text-align:left; font-size:13px; color: var(--brick-dk); margin-top:10px; margin-bottom:4px; padding-left:8px;">
+          DUPLICATES TO CLOSE (${dupN}):
+        </p>
+        <div style="max-height:12vh; overflow-y:auto;">${dupRows}</div>
+      ` : ""}
+      ${ejectRows ? `
+        <p style="text-align:left; font-size:13px; color: var(--brick-dk); margin-top:10px; margin-bottom:4px; padding-left:8px;">
+          UNGROUP FROM WORKSPACES (${ejectN}):
+        </p>
+        <div style="max-height:12vh; overflow-y:auto;">${ejectRows}</div>
+      ` : ""}`,
+    confirmText: "ORGANIZE",
+    onConfirm: async () => {
+      await executeOrganize(diff, plan.activeGroupsByWsId);
+      closeModal();
+      sfxPipe();
+      const parts = [];
+      if (groupN > 0) parts.push(`ORGANIZED ${groupN} TAB${groupN !== 1 ? "S" : ""}`);
+      if (dupN > 0) parts.push(`CLOSED ${dupN} DUP${dupN !== 1 ? "S" : ""}`);
+      if (ejectN > 0) parts.push(`UNGROUPED ${ejectN}`);
+      toast(parts.join(" · "));
+    },
+  });
+}
+
+// ============================================================
 // EVENT WIRING
 // ============================================================
 
@@ -1107,6 +1650,7 @@ $("btn-help").addEventListener("click", openHelpModal);
 $("btn-theme").addEventListener("click", toggleTheme);
 $("btn-sound").addEventListener("click", toggleSound);
 $("btn-cleanup").addEventListener("click", closeOrphanTabs);
+$("btn-organize").addEventListener("click", organizeTabs);
 
 // Workspace search
 $("workspace-search").addEventListener("input", (e) => {
@@ -1204,6 +1748,7 @@ function openHelpModal() {
           <span class="k">x / ⌫</span><span>Close the selected tab (or all duplicates if it's a group head)</span>
           <span class="k">1 – 9</span><span>Quick-open workspace #1–9</span>
           <span class="k">n</span><span>New workspace</span>
+          <span class="k">o</span><span>Organize tabs into workspace groups · remove duplicates</span>
           <span class="k">r</span><span>Rename selected workspace</span>
           <span class="k">d / ⌫</span><span>Delete selected workspace</span>
           <span class="k">v</span><span>Cycle tab-list view (window / site / recent) · Tab also works</span>
@@ -1225,6 +1770,8 @@ function openHelpModal() {
           <li>· <strong>×</strong> button on a tab — close it</li>
           <li>· <strong>×N</strong> on a duplicate group — close all duplicates at once</li>
           <li>· <strong>× ALL</strong> on a BY SITE domain header — close every tab from that site</li>
+          <li>· <strong>× ALL</strong> on a BY WINDOW group sub-header — close every tab inside that Chrome group (or all the UNGROUPED tabs in that window)</li>
+          <li>· <strong>🪄 N</strong> button in top bar — snap open tabs into their workspace groups & close duplicates (also <kbd style="font-size:8px">o</kbd>)</li>
           <li>· <strong>🗑️ N</strong> button in top bar (only when N > 0) — close all orphan tabs not in any workspace</li>
         </ul>
       </div>
@@ -1336,6 +1883,15 @@ $("tab-list").addEventListener("click", (e) => {
     e.stopPropagation();
     return;
   }
+  const closeGroupBtn = e.target.closest("[data-action='close-group']");
+  if (closeGroupBtn) {
+    closeGroupTabs(
+      parseInt(closeGroupBtn.dataset.windowId),
+      parseInt(closeGroupBtn.dataset.groupId),
+    );
+    e.stopPropagation();
+    return;
+  }
   const closeBtn = e.target.closest("[data-action='close-tab']");
   if (closeBtn) {
     closeTab(parseInt(closeBtn.dataset.tabId));
@@ -1377,6 +1933,10 @@ chrome.tabs.onMoved.addListener(refreshAndRender);
 chrome.tabs.onActivated.addListener(refreshAndRender);
 chrome.windows.onCreated?.addListener(refreshAndRender);
 chrome.windows.onRemoved?.addListener(refreshAndRender);
+chrome.tabGroups?.onCreated.addListener(refreshAndRender);
+chrome.tabGroups?.onRemoved.addListener(refreshAndRender);
+chrome.tabGroups?.onUpdated.addListener(refreshAndRender);
+chrome.tabGroups?.onMoved.addListener(refreshAndRender);
 
 // ============================================================
 // KEYBOARD
@@ -1435,6 +1995,7 @@ document.addEventListener("keydown", (e) => {
   if (k === "?" || (k === "/" && e.shiftKey)) { openHelpModal(); e.preventDefault(); return; }
   if (k === "/" && !e.shiftKey) { $("workspace-search").focus(); $("workspace-search").select(); e.preventDefault(); return; }
   if (k === "n") { openNewWorkspaceModal(); e.preventDefault(); return; }
+  if (k === "o") { organizeTabs(); e.preventDefault(); return; }
   if (k === "r" && state.focusPanel === "ws" && state.workspaces[state.wsIdx]) {
     openEditWorkspaceModal(state.wsIdx);
     e.preventDefault();
@@ -1510,6 +2071,8 @@ document.addEventListener("keydown", (e) => {
         closeDomainTabs(sel.domain);
       } else if (sel.kind === "window-header") {
         closeWindowTabs(sel.windowId);
+      } else if (sel.kind === "group-header") {
+        closeGroupTabs(sel.windowId, sel.groupId);
       } else if (sel.kind === "recent") {
         restoreSession(sel.id);
       } else {
@@ -1638,7 +2201,9 @@ async function openBookmarkImportWizard(folders) {
     row.classList.toggle("selected");
     row.querySelector("input").checked = row.classList.contains("selected");
   });
-  setupListNavigation($("bmk-folders"), ".bookmark-folder");
+  setupListNavigation($("bmk-folders"), ".bookmark-folder", {
+    onDownOut: () => $("modal-confirm").focus(),
+  });
   // also override cancel: mark first launch done so it doesn't pop up again
   $("modal-cancel").addEventListener("click", async () => {
     state.settings.firstLaunchDone = true;

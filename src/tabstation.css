@@ -849,7 +849,8 @@ button {
 }
 
 .window-group-header.domain-header,
-.window-group-header.window-header {
+.window-group-header.window-header,
+.window-group-header.group-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -857,11 +858,30 @@ button {
 }
 
 .domain-header.selected,
-.window-header.selected {
+.window-header.selected,
+.group-header.selected {
   outline: 3px solid var(--coin);
   outline-offset: 1px;
   background: var(--coin-hi);
 }
+
+/* Tabstation/manual/ungrouped sub-headers inside a window section */
+.window-group-header.group-header {
+  font-size: 8px;
+  padding: 5px 8px;
+  margin-left: 12px;
+  margin-bottom: 3px;
+  border-style: solid;
+  border-width: 2px;
+}
+.group-header.color-red { background: #ffb3b0; border-color: var(--red); }
+.group-header.color-yellow { background: var(--coin); border-color: var(--brick-dk); }
+.group-header.color-green { background: #a3e6a3; border-color: var(--pipe-dk); }
+.group-header.color-blue { background: #b0c8ff; border-color: #1a3a8a; }
+.group-header.color-purple { background: #d6b0ff; border-color: #5d275d; }
+.group-header.color-cyan { background: #b0e6ff; border-color: #006a8a; }
+.group-header.color-pink { background: #ffc8d8; border-color: #a83a6a; }
+.group-header.color-orange { background: var(--brick-lt); border-color: var(--brick-dk); }
 
 .btn-close-domain {
   font-family: "Press Start 2P", monospace;
