@@ -5,6 +5,27 @@ All notable changes to Tabstation are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-05-29
+
+### Added
+- **🪄 ORGANIZE button** (and `o` key) — one-click tidy that:
+  - Snaps open tabs into their workspace's Chrome tab group (reusing the
+    existing group if the workspace is already "active")
+  - Closes duplicate tabs (keeps the active one, else the oldest)
+  - Ejects "misplaced" tabs — orphan tabs stuck inside a workspace group
+    (e.g. a link you clicked from inside the group that doesn't belong)
+  - Slides every workspace group to the front of its window in workspace
+    order, pushing orphan tabs to the right
+  - Consolidates a workspace's scattered tabs to a single window (existing
+    group's window > most matches > current window)
+  - When a URL belongs to multiple workspaces, picks the one with the
+    currently-open Chrome group, else the workspace with the most matched
+    open tabs (workspace order is the tiebreak)
+- **BY WINDOW now sub-groups by Chrome tab group**: each workspace group
+  becomes a colour-coded sub-header in workspace order, then non-Tabstation
+  Chrome groups, then a `· UNGROUPED` section. Every sub-header has
+  `× ALL` to batch-close the section, and is keyboard-navigable.
+
 ## [0.3.0] - 2026-05-28
 
 ### Added
@@ -44,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recency), duplicate collapse, orphan cleanup, recently-closed restore,
   first-launch bookmark import wizard, and light / dark / auto themes.
 
+[0.4.0]: https://github.com/dora-dotcom/tabstation/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dora-dotcom/tabstation/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dora-dotcom/tabstation/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dora-dotcom/tabstation/releases/tag/v0.1.0
